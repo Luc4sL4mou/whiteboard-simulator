@@ -15,6 +15,21 @@ namespace WhiteboardSimulator;
 /// Autoteste das ferramentas (só na versão de depuração, ligado por "--selftest pasta").
 /// Dispara eventos de mouse dentro do próprio app, confere o resultado e grava um relatório e imagens.
 /// </summary>
+internal static class RealKeys
+{
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+
+    /// <summary>Aperta Ctrl + uma tecla no teclado de verdade (o app precisa estar em primeiro plano).</summary>
+    public static void CtrlPress(byte vk)
+    {
+        keybd_event(0x11, 0, 0, UIntPtr.Zero);
+        keybd_event(vk, 0, 0, UIntPtr.Zero);
+        keybd_event(vk, 0, 2, UIntPtr.Zero);
+        keybd_event(0x11, 0, 2, UIntPtr.Zero);
+    }
+}
+
 internal static class SelfTest
 {
     public static async Task Run(MainWindow window, string outDir)
@@ -53,6 +68,79 @@ internal static class SelfTest
             Check("caneta: cor automática = preto no quadro branco", stroke?.Color == "#1F2328");
             await Pump();
             Check("a dica some quando o quadro tem elementos", window.HintPanel.Visibility != Visibility.Visible);
+
+            // ---- Ctrl+Z de verdade (teclado real, com o foco no quadro) ----
+            {
+                window.Activate();
+                canvas.Focus();
+                await Pump();
+                int n0 = board.Elements.Count;
+                RealKeys.CtrlPress(0x5A);    // Z
+                await Pump(); await Task.Delay(300); await Pump();
+                Check($"Ctrl+Z real desfaz o último traço (foco={System.Windows.Input.Keyboard.FocusedElement?.GetType().Name}, {n0}->{board.Elements.Count})", board.Elements.Count == n0 - 1);
+                RealKeys.CtrlPress(0x59);    // Y
+                await Pump(); await Task.Delay(300); await Pump();
+                Check("Ctrl+Y real refaz", board.Elements.Count == n0);
+            }
+
+            // ---- O quadro não rola além das bordas ----
+            {
+                board.ResetView();
+                board.PanY += 500; board.PanX -= 500;
+                await Pump();
+                Check("quadro a 100% não desloca (roda/arrasto não rolam)", board.PanX == 0 && board.PanY == 0);
+                board.Zoom = 2;
+                board.PanX = 99999; board.PanY = -99999;
+                await Pump();
+                double limX = canvas.ActualWidth / 2, limY = canvas.ActualHeight / 2;
+                Check("com zoom 200% o deslocamento para na borda", Math.Abs(board.PanX - limX) < 1 && Math.Abs(board.PanY + limY) < 1);
+                canvas.ZoomAt(new Point(canvas.ActualWidth / 2, canvas.ActualHeight / 2), 0.1);
+                board.ResetView();
+                await Pump();
+                Check("zoom volta ao centro ao reiniciar a visualização", board.PanX == 0 && board.PanY == 0 && board.Zoom == 1);
+            }
+
+            // ---- Pomodoro ----
+            {
+                var pomo = vm.Pomodoro;
+                int fm = pomo.FocusMinutes;
+                Check("pomodoro: começa no foco, tempo cheio", pomo.IsFocus && !pomo.IsRunning && pomo.TimeText == $"{fm:00}:00");
+                pomo.AdjustCommand.Execute("F+");
+                Check("pomodoro: ajuste de +1 min no foco", pomo.FocusMinutes == fm + 1 && pomo.TimeText == $"{fm + 1:00}:00");
+                pomo.AdjustCommand.Execute("F-");
+                pomo.StartPauseCommand.Execute(null);
+                Check("pomodoro: iniciar", pomo.IsRunning && pomo.StartPauseText == "Pausar");
+                pomo.Tick(DateTime.UtcNow.AddMinutes(fm - 1).AddSeconds(1));
+                Check("pomodoro: falta cerca de 1 min", pomo.TimeText is "01:00" or "00:59" or "01:01");
+                pomo.StartPauseCommand.Execute(null);
+                Check("pomodoro: pausar", !pomo.IsRunning && pomo.StartPauseText == "Continuar");
+                pomo.StartPauseCommand.Execute(null);
+                pomo.Tick(DateTime.UtcNow.AddMinutes(fm + 2));
+                Check("pomodoro: fim do foco vai para a pausa curta, sem iniciar sozinho",
+                    pomo.IsShortBreak && !pomo.IsRunning && pomo.CompletedFocus >= 1);
+                pomo.SelectModeCommand.Execute("Long");
+                Check("pomodoro: escolher pausa longa", pomo.IsLongBreak);
+                pomo.SelectModeCommand.Execute("Focus");
+                pomo.ResetCommand.Execute(null);
+                Check("pomodoro: reiniciar volta ao tempo cheio", pomo.IsFocus && pomo.TimeText == $"{fm:00}:00");
+
+                // Janela flutuante: abre pelo botão, sempre no topo, travar bloqueia os controles, transparência.
+                vm.IsPomodoroOpen = true;
+                await Pump();
+                var pw = System.Windows.Application.Current.Windows.OfType<PomodoroWindow>().FirstOrDefault();
+                Check("pomodoro: janela flutuante abre, visível e sempre no topo", pw != null && pw.IsVisible && pw.Topmost);
+                pomo.IsLocked = true;
+                Check("pomodoro: travar bloqueia os controles", !pomo.IsUnlocked && pomo.LockToolTip.StartsWith("Destravar"));
+                pomo.IsLocked = false;
+                pomo.Transparency = 0.4;
+                Check("pomodoro: transparência 40% = opacidade 0,6", Math.Abs(pomo.BackgroundOpacity - 0.6) < 0.001 && pomo.OpacityText == "40%");
+                pomo.Transparency = 0.99;
+                Check("pomodoro: transparência tem limite (fundo legível)", pomo.BackgroundOpacity >= PomodoroViewModel.MinOpacity - 0.001);
+                pomo.Transparency = 0.2;
+                pomo.CloseCommand.Execute(null);
+                await Pump();
+                Check("pomodoro: fechar esconde a janela sem parar o relógio", pw != null && !pw.IsVisible);
+            }
 
             // ---- Formas ----
             tool.Tool = ToolType.Rectangle;
@@ -110,6 +198,19 @@ internal static class SelfTest
             Check("post-it: editor aberto", canvas.ActiveEditor != null);
             if (canvas.ActiveEditor != null) { canvas.TestSetEditorText("Comprar tinta"); canvas.CommitEditForTest(); }
             Check("post-it: texto salvo", sticky?.Text == "Comprar tinta");
+
+            // Ctrl+Z real logo depois de fechar o editor do post-it (o foco estava no editor).
+            {
+                window.Activate();
+                await Pump();
+                var focusBefore = System.Windows.Input.Keyboard.FocusedElement?.GetType().Name;
+                RealKeys.CtrlPress(0x5A);
+                await Pump(); await Task.Delay(300); await Pump();
+                Check($"Ctrl+Z real depois de editar post-it desfaz o texto (foco antes={focusBefore}, texto='{sticky?.Text}')", sticky?.Text != "Comprar tinta");
+                RealKeys.CtrlPress(0x59);
+                await Pump(); await Task.Delay(300); await Pump();
+                Check("Ctrl+Y real devolve o texto do post-it", sticky?.Text == "Comprar tinta");
+            }
 
             // ---- Alfinetes ----
             tool.Tool = ToolType.Pin;

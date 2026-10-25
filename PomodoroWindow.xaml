@@ -1,0 +1,218 @@
+<Window x:Class="WhiteboardSimulator.PomodoroWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pomodoro" Width="328" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
+        FontFamily="Segoe UI Variable Text, Segoe UI" UseLayoutRounding="True" SnapsToDevicePixels="True">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+
+    <!-- DataContext = PomodoroViewModel. O fundo é translúcido (controlado pelo usuário); o conteúdo fica opaco. -->
+    <Border Margin="16" Background="{Binding PanelBackground}" CornerRadius="16"
+            BorderBrush="#26000000" BorderThickness="1" Effect="{StaticResource Shadow.Soft}">
+        <StackPanel Margin="14,8,14,14">
+
+            <!-- Cabeçalho: arraste por aqui; cadeado trava a janela; X fecha (o relógio continua correndo) -->
+            <Grid Background="Transparent" MouseLeftButtonDown="OnHeaderMouseDown" Cursor="{Binding HeaderCursor}"
+                  Margin="0,0,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Pomodoro" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
+                           Foreground="{StaticResource Brush.InkMuted}" Margin="2,0,0,0" />
+                <Button Grid.Column="1" Style="{StaticResource PomoIconButtonStyle}" Width="30" Height="30" Margin="0"
+                        Command="{Binding ToggleLockCommand}" ToolTip="{Binding LockToolTip}"
+                        AutomationProperties.Name="Travar ou destravar a janela">
+                    <Path Data="{Binding LockIcon}" Style="{StaticResource BarIcon}" Width="20" Height="20"
+                          Stroke="{StaticResource Brush.InkMuted}" />
+                </Button>
+                <Button Grid.Column="2" Style="{StaticResource PomoIconButtonStyle}" Width="30" Height="30" Margin="2,0,0,0"
+                        Command="{Binding CloseCommand}" ToolTip="Fechar (o tempo continua correndo)"
+                        IsEnabled="{Binding IsUnlocked}" AutomationProperties.Name="Fechar Pomodoro">
+                    <Path Data="{StaticResource Icon.Close}" Style="{StaticResource BarIcon}" Width="20" Height="20"
+                          Stroke="{StaticResource Brush.InkMuted}" />
+                </Button>
+            </Grid>
+
+            <!-- Tudo abaixo é bloqueado quando a janela está travada (evita cliques sem querer) -->
+            <UniformGrid Columns="3" Margin="0,0,0,10" IsEnabled="{Binding IsUnlocked}">
+                <Button Style="{StaticResource PomoTabStyle}" Tag="{Binding IsFocus}"
+                        Command="{Binding SelectModeCommand}" CommandParameter="Focus">
+                    <TextBlock Text="Foco" HorizontalAlignment="Center" />
+                </Button>
+                <Button Style="{StaticResource PomoTabStyle}" Tag="{Binding IsShortBreak}"
+                        Command="{Binding SelectModeCommand}" CommandParameter="Short">
+                    <TextBlock Text="Pausa curta" HorizontalAlignment="Center" />
+                </Button>
+                <Button Style="{StaticResource PomoTabStyle}" Tag="{Binding IsLongBreak}"
+                        Command="{Binding SelectModeCommand}" CommandParameter="Long">
+                    <TextBlock Text="Pausa longa" HorizontalAlignment="Center" />
+                </Button>
+            </UniformGrid>
+
+            <!-- Anel de progresso -->
+            <Grid Width="176" Height="176" HorizontalAlignment="Center" Margin="0,4,0,8">
+                <Ellipse Stroke="#1F000000" StrokeThickness="8" />
+                <Ellipse Stroke="{Binding RingBrush}" StrokeThickness="8"
+                         StrokeDashArray="{Binding RingDash}" StrokeDashCap="Flat"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <RotateTransform Angle="-90" />
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding TimeText}" FontSize="40" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Foreground="{StaticResource Brush.Ink}" />
+                    <TextBlock Text="{Binding SessionLabel}" FontSize="12" HorizontalAlignment="Center"
+                               Foreground="{Binding RingBrush}" FontWeight="SemiBold" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Controles -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" IsEnabled="{Binding IsUnlocked}">
+                <Button Style="{StaticResource PomoIconButtonStyle}" Command="{Binding ResetCommand}"
+                        ToolTip="Reiniciar a sessão" AutomationProperties.Name="Reiniciar sessão">
+                    <Path Data="{StaticResource Icon.Reset}" Stroke="{StaticResource Brush.InkMuted}"
+                          Style="{StaticResource BarIcon}" />
+                </Button>
+                <Button Command="{Binding StartPauseCommand}" Cursor="Hand" Margin="4,0"
+                        AutomationProperties.Name="Iniciar ou pausar">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" CornerRadius="20" MinWidth="120" Height="40" Padding="22,0"
+                                    Background="{Binding RingBrush}">
+                                <TextBlock Text="{Binding StartPauseText}" Foreground="White"
+                                           FontSize="14" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Opacity" Value="0.9" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Bd" Property="Opacity" Value="0.75" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="Bd" Property="Opacity" Value="0.5" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+                <Button Style="{StaticResource PomoIconButtonStyle}" Command="{Binding SkipCommand}"
+                        ToolTip="Pular para a próxima sessão" AutomationProperties.Name="Pular sessão">
+                    <Path Data="{StaticResource Icon.Skip}" Stroke="{StaticResource Brush.InkMuted}"
+                          Style="{StaticResource BarIcon}" />
+                </Button>
+            </StackPanel>
+
+            <!-- Rodapé: música (ainda sem função), ciclo e ajustes -->
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Style="{StaticResource TopBarButtonStyle}" IsEnabled="False"
+                        HorizontalAlignment="Left" Margin="0" ToolTip="Música (em breve)"
+                        AutomationProperties.Name="Música">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource Icon.Music}" Stroke="{StaticResource Brush.InkMuted}"
+                              Style="{StaticResource BarIcon}" />
+                        <TextBlock Text="Música" Style="{StaticResource BarLabel}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Grid.Column="1" Text="{Binding CycleText}" FontSize="12"
+                           VerticalAlignment="Center" Foreground="{StaticResource Brush.InkMuted}" />
+                <Button Grid.Column="2" Style="{StaticResource TopBarButtonStyle}" HorizontalAlignment="Right"
+                        Margin="0" Command="{Binding ToggleSettingsCommand}" IsEnabled="{Binding IsUnlocked}"
+                        ToolTip="Ajustes: tempos e transparência" AutomationProperties.Name="Ajustes do Pomodoro">
+                    <Path Data="{StaticResource Icon.Settings}" Stroke="{StaticResource Brush.InkMuted}"
+                          Style="{StaticResource BarIcon}" />
+                </Button>
+            </Grid>
+
+            <!-- Ajustes: transparência do fundo e tempos -->
+            <Border Margin="0,6,0,0" Padding="0,8,0,0" BorderBrush="#14000000" BorderThickness="0,1,0,0"
+                    Visibility="{Binding IsSettingsOpen, Converter={StaticResource BoolToVis}}"
+                    IsEnabled="{Binding IsUnlocked}">
+                <StackPanel>
+                    <Grid Margin="4,0,4,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="40" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Transparência" FontSize="13" VerticalAlignment="Center"
+                                   Foreground="{StaticResource Brush.Ink}" />
+                        <Slider Grid.Column="1" Minimum="0" Maximum="0.7" Value="{Binding Transparency, Mode=TwoWay}"
+                                Margin="10,0" VerticalAlignment="Center" ToolTip="Transparência do fundo da janela" />
+                        <TextBlock Grid.Column="2" Text="{Binding OpacityText}" FontSize="12" FontWeight="SemiBold"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   Foreground="{StaticResource Brush.Ink}" />
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="40" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.Resources>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="VerticalAlignment" Value="Center" />
+                                <Setter Property="Margin" Value="4,4" />
+                                <Setter Property="FontSize" Value="13" />
+                                <Setter Property="Foreground" Value="{StaticResource Brush.Ink}" />
+                            </Style>
+                        </Grid.Resources>
+
+                        <TextBlock Grid.Row="0" Text="Foco (min)" />
+                        <Button Grid.Row="0" Grid.Column="1" Style="{StaticResource PomoStepStyle}" Content="−"
+                                Command="{Binding AdjustCommand}" CommandParameter="F-" />
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding FocusMinutes}"
+                                   HorizontalAlignment="Center" FontWeight="SemiBold" />
+                        <Button Grid.Row="0" Grid.Column="3" Style="{StaticResource PomoStepStyle}" Content="+"
+                                Command="{Binding AdjustCommand}" CommandParameter="F+" />
+
+                        <TextBlock Grid.Row="1" Text="Pausa curta (min)" />
+                        <Button Grid.Row="1" Grid.Column="1" Style="{StaticResource PomoStepStyle}" Content="−"
+                                Command="{Binding AdjustCommand}" CommandParameter="S-" />
+                        <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding ShortBreakMinutes}"
+                                   HorizontalAlignment="Center" FontWeight="SemiBold" />
+                        <Button Grid.Row="1" Grid.Column="3" Style="{StaticResource PomoStepStyle}" Content="+"
+                                Command="{Binding AdjustCommand}" CommandParameter="S+" />
+
+                        <TextBlock Grid.Row="2" Text="Pausa longa (min)" />
+                        <Button Grid.Row="2" Grid.Column="1" Style="{StaticResource PomoStepStyle}" Content="−"
+                                Command="{Binding AdjustCommand}" CommandParameter="L-" />
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding LongBreakMinutes}"
+                                   HorizontalAlignment="Center" FontWeight="SemiBold" />
+                        <Button Grid.Row="2" Grid.Column="3" Style="{StaticResource PomoStepStyle}" Content="+"
+                                Command="{Binding AdjustCommand}" CommandParameter="L+" />
+
+                        <TextBlock Grid.Row="3" Text="Focos até a pausa longa" />
+                        <Button Grid.Row="3" Grid.Column="1" Style="{StaticResource PomoStepStyle}" Content="−"
+                                Command="{Binding AdjustCommand}" CommandParameter="C-" />
+                        <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding Cycles}"
+                                   HorizontalAlignment="Center" FontWeight="SemiBold" />
+                        <Button Grid.Row="3" Grid.Column="3" Style="{StaticResource PomoStepStyle}" Content="+"
+                                Command="{Binding AdjustCommand}" CommandParameter="C+" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</Window>

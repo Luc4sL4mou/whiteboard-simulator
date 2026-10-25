@@ -13,6 +13,7 @@
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <!-- Permite rodar em máquinas que só têm um runtime mais novo (ex.: .NET 10). -->
     <RollForward>LatestMajor</RollForward>
+    <Version>0.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

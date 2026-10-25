@@ -231,6 +231,7 @@ public sealed class BoardCanvas : Grid
     private void UpdateTransform()
     {
         if (_exporting) return;
+        if (ClampPan()) return;      // o ajuste dispara de novo (PanX/PanY mudaram)
         double z = Zoom;
         double cx = ActualWidth / 2, cy = ActualHeight / 2;
         var m = Matrix.Identity;
@@ -239,6 +240,25 @@ public sealed class BoardCanvas : Grid
         m.Translate(cx + (Board?.PanX ?? 0), cy + (Board?.PanY ?? 0));
         _world.RenderTransform = new MatrixTransform(m);
         RefreshSelection();
+    }
+
+    /// <summary>
+    /// O quadro é como um quadro de verdade: não rola para além das bordas. Com zoom maior que 100% dá para
+    /// passear por ele, mas a borda nunca entra na tela; com zoom menor, ele fica centralizado.
+    /// Devolve true se precisou corrigir o deslocamento.
+    /// </summary>
+    private bool ClampPan()
+    {
+        if (Board == null || ActualWidth <= 0 || ActualHeight <= 0) return false;
+        double z = Zoom;
+        double limitX = Math.Max(0, ActualWidth / 2 * (z - 1));
+        double limitY = Math.Max(0, ActualHeight / 2 * (z - 1));
+        double px = Math.Max(-limitX, Math.Min(limitX, Board.PanX));
+        double py = Math.Max(-limitY, Math.Min(limitY, Board.PanY));
+        if (Math.Abs(px - Board.PanX) < 0.0001 && Math.Abs(py - Board.PanY) < 0.0001) return false;
+        Board.PanX = px;
+        Board.PanY = py;
+        return true;
     }
 
     /// <summary>Zoom mantendo o ponto sob o mouse no mesmo lugar.</summary>
@@ -251,9 +271,9 @@ public sealed class BoardCanvas : Grid
 
         double cx = ActualWidth / 2, cy = ActualHeight / 2;
         var world = new Point((viewPoint.X - cx - Board.PanX) / z + cx, (viewPoint.Y - cy - Board.PanY) / z + cy);
+        Board.Zoom = nz;      // primeiro o zoom: o limite do deslocamento depende dele
         Board.PanX = viewPoint.X - cx - (world.X - cx) * nz;
         Board.PanY = viewPoint.Y - cy - (world.Y - cy) * nz;
-        Board.Zoom = nz;
     }
 
     protected override void OnMouseWheel(MouseWheelEventArgs e)

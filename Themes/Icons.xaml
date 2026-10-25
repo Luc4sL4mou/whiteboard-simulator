@@ -29,4 +29,10 @@
     <Geometry x:Key="Icon.Chevron">M7,10 L12,15 L17,10</Geometry>
     <Geometry x:Key="Icon.Settings">M4,7 H20 M4,17 H20 M9,4 V10 M15,14 V20</Geometry>
     <Geometry x:Key="Icon.Palette">M12,3 A9,9 0 1 0 12,21 C14,21 14,19 13,18 C12,17 13,15 15,15 H17 A4,4 0 0 0 21,11 C21,6.5 17,3 12,3 Z</Geometry>
+    <Geometry x:Key="Icon.Timer">M12,6 A8,8 0 1 0 12,22 A8,8 0 1 0 12,6 Z M12,10 V14 L14.5,16 M9.5,2.5 H14.5 M12,2.5 V6</Geometry>
+    <Geometry x:Key="Icon.Music">M9,18 V6 L19,4 V16 M9,18 A2.5,2.5 0 1 1 4,18 A2.5,2.5 0 1 1 9,18 Z M19,16 A2.5,2.5 0 1 1 14,16 A2.5,2.5 0 1 1 19,16 Z</Geometry>
+    <Geometry x:Key="Icon.Play">M8,5 L19,12 L8,19 Z</Geometry>
+    <Geometry x:Key="Icon.Pause">M8,5 V19 M16,5 V19</Geometry>
+    <Geometry x:Key="Icon.Reset">M4,12 A8,8 0 1 0 7,6 M4,4 V9 H9</Geometry>
+    <Geometry x:Key="Icon.Skip">M5,5 L15,12 L5,19 Z M19,5 V19</Geometry>
 </ResourceDictionary>

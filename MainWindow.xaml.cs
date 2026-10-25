@@ -39,13 +39,38 @@ public partial class MainWindow : Window, IBoardView
         vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.TitleBarColor)) ApplyTitleBarTheme();
+            if (e.PropertyName == nameof(MainViewModel.IsPomodoroOpen)) UpdatePomodoroWindow();
         };
+        vm.Pomodoro.CloseRequested += () => vm.IsPomodoroOpen = false;
 
         // Depois que a janela aparece, oferece restaurar quadros de uma sessão que caiu.
         Loaded += (_, _) => Dispatcher.InvokeAsync(vm.OfferRecovery, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private MainViewModel ViewModel => (MainViewModel)DataContext;
+
+    // ---- Janela flutuante do Pomodoro (sempre no topo; não depende da janela principal estar visível) ----
+
+    private PomodoroWindow? _pomodoroWindow;
+
+    private void UpdatePomodoroWindow()
+    {
+        if (ViewModel.IsPomodoroOpen)
+        {
+            _pomodoroWindow ??= new PomodoroWindow(ViewModel.Pomodoro);
+            _pomodoroWindow.Show();
+        }
+        else
+        {
+            _pomodoroWindow?.Hide();
+        }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _pomodoroWindow?.Close();
+        base.OnClosed(e);
+    }
 
     // ---- Barra de título nativa acompanhando o tema ----
 
@@ -137,6 +162,12 @@ public partial class MainWindow : Window, IBoardView
         bool typing = Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase;
         var mods = Keyboard.Modifiers;
 
+        if (TryHandleUndoKey(e.Key, mods, typing))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (!typing && mods == ModifierKeys.Control && e.Key == Key.D)
         {
             BoardArea.DuplicateSelection();      // Ctrl+D: duplica o que está selecionado
@@ -177,6 +208,31 @@ public partial class MainWindow : Window, IBoardView
         }
 
         base.OnPreviewKeyDown(e);
+    }
+
+    /// <summary>
+    /// Ctrl+Z desfaz e Ctrl+Y / Ctrl+Shift+Z refaz a última ação do quadro, não importa onde esteja o foco.
+    /// Só o texto sendo digitado no quadro usa o desfazer próprio (enquanto tiver algo a desfazer/refazer);
+    /// campos de texto da barra também seguem o desfazer deles.
+    /// </summary>
+    private bool TryHandleUndoKey(Key key, ModifierKeys mods, bool typing)
+    {
+        bool undo = key == Key.Z && mods == ModifierKeys.Control;
+        bool redo = (key == Key.Y && mods == ModifierKeys.Control) || (key == Key.Z && mods == (ModifierKeys.Control | ModifierKeys.Shift));
+        if (!undo && !redo) return false;
+
+        if (typing)
+        {
+            if (Keyboard.FocusedElement is not System.Windows.Controls.RichTextBox editor || BoardArea.ActiveEditor != editor)
+                return false;                                   // campo de texto comum: desfaz o próprio texto
+            if (undo ? editor.CanUndo : editor.CanRedo)
+                return false;                                   // ainda há o que desfazer na digitação
+            BoardArea.CommitPendingEdit();                       // acabou a digitação: o próximo passo é do quadro
+        }
+
+        var command = undo ? ViewModel.UndoCommand : ViewModel.RedoCommand;
+        if (command.CanExecute(null)) command.Execute(null);
+        return true;
     }
 
     /// <summary>Com a borracha ativa, + aumenta e - diminui o tamanho (teclado principal ou numérico; no ABNT2 o + é Shift+=).</summary>

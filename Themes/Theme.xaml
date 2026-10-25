@@ -272,4 +272,33 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- Abas do Pomodoro: a aba da sessão atual (Tag = True) ganha o destaque -->
+    <Style x:Key="PomoTabStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonStyle}">
+        <Setter Property="Margin" Value="2,0" />
+        <Setter Property="Padding" Value="4,7" />
+        <Setter Property="FontSize" Value="12" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="True">
+                <Setter Property="Template" Value="{StaticResource ChipSelectedTemplate}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Botão redondo de ícone do Pomodoro (reiniciar, pular) -->
+    <Style x:Key="PomoIconButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolButtonStyle}">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Margin" Value="4,0" />
+    </Style>
+
+    <!-- Botão + / - dos ajustes do Pomodoro -->
+    <Style x:Key="PomoStepStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonStyle}">
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Width" Value="30" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="15" />
+    </Style>
 </ResourceDictionary>

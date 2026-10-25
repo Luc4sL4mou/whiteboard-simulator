@@ -19,8 +19,10 @@ public partial class App : Application
         base.OnStartup(e);
 
         // Instância única: abrir de novo (atalho) só traz a janela existente de volta.
-        _mutex = new Mutex(true, @"Local\WhiteboardSimulator.SingleInstance", out bool isFirst);
-        _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\WhiteboardSimulator.Show");
+        // Nos testes (WBS_DATA_DIR definido) a instância é separada, para não esbarrar no app do usuário.
+        string suffix = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WBS_DATA_DIR")) ? "" : ".test";
+        _mutex = new Mutex(true, @"Local\WhiteboardSimulator.SingleInstance" + suffix, out bool isFirst);
+        _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\WhiteboardSimulator.Show" + suffix);
         if (!isFirst)
         {
             _showEvent.Set();
@@ -44,6 +46,14 @@ public partial class App : Application
                 await Task.Delay(2500);
                 await SelfTest.Run(window, outDir);
             }, System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        // Gravador de demonstração (só em depuração): --demo <pasta de saída>
+        int demoAt = Array.IndexOf(args, "--demo");
+        if (demoAt >= 0 && demoAt + 1 < args.Length)
+        {
+            var demoDir = args[demoAt + 1];
+            _ = Dispatcher.InvokeAsync(async () => await DemoRecorder.Run(window, demoDir), System.Windows.Threading.DispatcherPriority.Background);
         }
 #endif
 

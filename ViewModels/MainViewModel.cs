@@ -25,6 +25,7 @@ public sealed class MainViewModel : ViewModelBase
     private BoardDocument _defaults;   // aparência usada em quadros novos (a última escolhida)
     private BoardViewModel _activeBoard;
     private bool _isPaletteOpen;
+    private bool _isPomodoroOpen;
     private string? _notice;
 
     public MainViewModel()
@@ -87,6 +88,8 @@ public sealed class MainViewModel : ViewModelBase
         SelectToolCommand = new RelayCommand(p => { if (p is ToolItemViewModel t) ToolState.Tool = t.Type; });
         SelectTintCommand = new RelayCommand(p => { if (p is ColorOption c) ActiveBoard.ChangeTint(c.Name); });
         TogglePaletteCommand = new RelayCommand(_ => IsPaletteOpen = !IsPaletteOpen);
+        TogglePomodoroCommand = new RelayCommand(_ => IsPomodoroOpen = !IsPomodoroOpen);
+        Pomodoro.Notice += ShowNotice;
 
         CreateTextCommands();
         ThickerCommand = new RelayCommand(_ => ChangeThickness(true));
@@ -151,6 +154,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand SelectToolCommand { get; }
     public ICommand SelectTintCommand { get; }
     public ICommand TogglePaletteCommand { get; }
+    public ICommand TogglePomodoroCommand { get; }
     public ICommand ThickerCommand { get; }
     public ICommand ThinnerCommand { get; }
     public ICommand EraserBiggerCommand { get; }
@@ -534,6 +538,14 @@ public sealed class MainViewModel : ViewModelBase
         Notify(nameof(ShowStickyColors));
         Notify(nameof(ShowPinColors));
         Notify(nameof(HasToolOptions));
+    }
+
+    public PomodoroViewModel Pomodoro { get; } = new();
+
+    public bool IsPomodoroOpen
+    {
+        get => _isPomodoroOpen;
+        set => Set(ref _isPomodoroOpen, value);
     }
 
     public bool IsPaletteOpen

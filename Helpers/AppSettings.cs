@@ -31,6 +31,16 @@ public sealed class AppSettings
     public BoardSurface Surface { get; set; } = BoardSurface.Whiteboard;
     public string Tint { get; set; } = "Branco suave";
 
+    // Pomodoro (minutos; ciclos = focos até a pausa longa).
+    public int PomodoroFocusMinutes { get; set; } = 25;
+    public int PomodoroShortBreakMinutes { get; set; } = 5;
+    public int PomodoroLongBreakMinutes { get; set; } = 15;
+    public int PomodoroCycles { get; set; } = 4;
+    public bool PomodoroLocked { get; set; }
+    public double PomodoroBackgroundOpacity { get; set; } = 0.8;
+    public double? PomodoroLeft { get; set; }
+    public double? PomodoroTop { get; set; }
+
     /// <summary>Quadros abertos/salvos recentemente (favoritos primeiro).</summary>
     public List<RecentFile> Recent { get; set; } = new();
 
