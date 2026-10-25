@@ -1,0 +1,15 @@
+# Texto com fim de linha normalizado no repositório (LF) e CRLF no Windows ao fazer checkout.
+* text=auto
+
+*.cs      text diff=csharp
+*.xaml    text
+*.csproj  text
+*.md      text
+*.iss     text
+*.ps1     text eol=crlf
+
+# Binários: nunca converter
+*.png     binary
+*.gif     binary
+*.ico     binary
+*.exe     binary
