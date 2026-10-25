@@ -149,7 +149,10 @@ Os GIFs deste README foram gerados pelo gravador de demonstração (`--demo <pas
 - **[Shields.io](https://shields.io/)** — os selos no topo.
 - O método Pomodoro foi criado por **Francesco Cirillo** no fim dos anos 1980.
 - As fontes do quadro (Segoe UI, Segoe Print, Calibri, etc.) são fontes do próprio Windows. Nenhuma é redistribuída aqui.
+- O logotipo foi gerado com uma ferramenta de IA generativa. Veja os [avisos de terceiros e de marcas](NOTICE.md).
 - Desenvolvido com a ajuda de **[Claude Code](https://claude.com/claude-code)**, da Anthropic.
+
+> *Pomodoro® e Pomodoro Technique® são marcas registradas de Francesco Cirillo. Este projeto não é afiliado, associado nem endossado por elas.*
 
 Obrigado a quem testar, abrir uma *issue* ou sugerir melhorias. 💙
 
