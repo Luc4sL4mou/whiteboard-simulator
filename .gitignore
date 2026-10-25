@@ -1,0 +1,12 @@
+# Saída de build e publicação (o executável publicado tem ~150 MB)
+bin/
+obj/
+publish/
+
+# IDE
+.vs/
+*.user
+*.suo
+
+# Arquivos temporários do WPF
+*_wpftmp.csproj

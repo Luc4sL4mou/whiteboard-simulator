@@ -1,0 +1,16 @@
+<Window x:Class="WhiteboardSimulator.InputDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="400" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner" Background="{StaticResource Brush.Surface}"
+        FontFamily="Segoe UI Variable Text, Segoe UI" UseLayoutRounding="True">
+    <StackPanel Margin="22,20,22,20">
+        <TextBlock x:Name="PromptText" FontSize="13" FontWeight="SemiBold"
+                   Foreground="{StaticResource Brush.Ink}" />
+        <TextBox x:Name="Input" Margin="0,10,0,0" Padding="8,7" FontSize="13" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+            <Button Content="Cancelar" Width="90" Height="32" IsCancel="True" Margin="0,0,8,0" />
+            <Button Content="OK" Width="90" Height="32" IsDefault="True" Click="OnOk" />
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -1,0 +1,62 @@
+<Window x:Class="WhiteboardSimulator.TrayNoteWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Whiteboard Simulator" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" Topmost="True" ShowActivated="False" ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight" Opacity="0"
+        FontFamily="Segoe Print, Segoe UI" UseLayoutRounding="True">
+
+    <!-- Aviso em formato de post-it amarelo, preso com um alfinete vermelho -->
+    <Grid Margin="22,26,26,30" Width="300" Cursor="Hand" MouseLeftButtonUp="OnNoteClicked">
+        <Grid.RenderTransform>
+            <RotateTransform Angle="-2.5" CenterX="150" CenterY="80" />
+        </Grid.RenderTransform>
+
+        <Border CornerRadius="2,2,2,22" Padding="18,26,18,14">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#FFEE7C" Offset="0" />
+                    <GradientStop Color="#FFE24F" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="18" ShadowDepth="5" Direction="290" Opacity="0.35" />
+            </Border.Effect>
+
+            <StackPanel>
+                <TextBlock Text="Ainda estou por aqui!" FontSize="17" FontWeight="Bold" Foreground="#3B3320" />
+                <TextBlock TextWrapping="Wrap" FontSize="12.5" LineHeight="19" Margin="0,8,0,0"
+                           Foreground="#4A4228"
+                           Text="Fechei a janela, mas o Whiteboard Simulator continua na bandeja do Windows (perto do relógio). Clique no ícone para abrir de novo, ou em &quot;Sair&quot; no menu dele para encerrar." />
+
+                <Grid Margin="0,14,0,0">
+                    <CheckBox x:Name="DontShowAgain" Content="Não avisar de novo" FontSize="11.5"
+                              Foreground="#4A4228" VerticalAlignment="Center" Cursor="Arrow"
+                              Checked="OnDontShowAgainChanged" Unchecked="OnDontShowAgainChanged"
+                              MouseLeftButtonUp="OnCheckBoxClicked" />
+                    <TextBlock Text="Entendi ✓" FontSize="12.5" FontWeight="Bold" Foreground="#3B3320"
+                               HorizontalAlignment="Right" VerticalAlignment="Center" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Alfinete -->
+        <Grid HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,-12,0,0" Width="26" Height="26"
+              IsHitTestVisible="False">
+            <Ellipse Fill="#33000000" Margin="3,5,-3,-5">
+                <Ellipse.Effect>
+                    <BlurEffect Radius="4" />
+                </Ellipse.Effect>
+            </Ellipse>
+            <Ellipse>
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="0.35,0.3">
+                        <GradientStop Color="#FF8A80" Offset="0" />
+                        <GradientStop Color="#D32F2F" Offset="0.6" />
+                        <GradientStop Color="#8E1B1B" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,789 @@
+<Window x:Class="WhiteboardSimulator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:WhiteboardSimulator.ViewModels"
+        xmlns:h="clr-namespace:WhiteboardSimulator.Helpers"
+        xmlns:ctl="clr-namespace:WhiteboardSimulator.Controls"
+        Title="{Binding WindowTitle}" Icon="Assets/logo.png" Width="1280" Height="800" MinWidth="1100" MinHeight="700"
+        WindowState="Maximized" WindowStartupLocation="CenterScreen"
+        Background="{Binding WindowBackground}"
+        FontFamily="Segoe UI Variable Text, Segoe UI" UseLayoutRounding="True" SnapsToDevicePixels="True">
+
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <!-- Atalhos clássicos do Windows -->
+    <Window.InputBindings>
+        <KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding NewBoardCommand}" />
+        <KeyBinding Key="T" Modifiers="Ctrl" Command="{Binding NewBoardCommand}" />
+        <KeyBinding Key="O" Modifiers="Ctrl" Command="{Binding OpenBoardCommand}" />
+        <KeyBinding Key="S" Modifiers="Ctrl" Command="{Binding SaveBoardCommand}" />
+        <KeyBinding Key="S" Modifiers="Ctrl+Shift" Command="{Binding SaveBoardAsCommand}" />
+        <KeyBinding Key="P" Modifiers="Ctrl" Command="{Binding PrintCommand}" />
+        <KeyBinding Key="W" Modifiers="Ctrl" Command="{Binding CloseTabCommand}" />
+        <KeyBinding Key="Z" Modifiers="Ctrl" Command="{Binding UndoCommand}" />
+        <KeyBinding Key="Y" Modifiers="Ctrl" Command="{Binding RedoCommand}" />
+        <KeyBinding Key="Z" Modifiers="Ctrl+Shift" Command="{Binding RedoCommand}" />
+        <KeyBinding Key="F2" Command="{Binding RenameBoardCommand}" />
+        <KeyBinding Key="Tab" Modifiers="Ctrl" Command="{Binding NextTabCommand}" />
+        <KeyBinding Key="Tab" Modifiers="Ctrl+Shift" Command="{Binding PreviousTabCommand}" />
+    </Window.InputBindings>
+
+    <Window.Resources>
+        <h:ResourceKeyConverter x:Key="ResourceKey" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <h:HalfSizeConverter x:Key="HalfSize" />
+
+        <!-- Ícone vetorial desenhado a partir de uma chave de Geometry -->
+        <DataTemplate x:Key="ToolTemplate" DataType="{x:Type vm:ToolItemViewModel}">
+            <Button x:Name="Btn" Style="{StaticResource ToolButtonStyle}"
+                    Command="{Binding DataContext.SelectToolCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                    CommandParameter="{Binding}" ToolTip="{Binding Tooltip}"
+                    AutomationProperties.Name="{Binding Name}">
+                <Path Data="{Binding IconKey, Converter={StaticResource ResourceKey}}"
+                      Width="24" Height="24"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                      StrokeThickness="1.8" StrokeLineJoin="Round" StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round" Stretch="None" />
+            </Button>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter TargetName="Btn" Property="Style" Value="{StaticResource ToolButtonSelectedStyle}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Opção de tema / moldura / superfície com miniatura -->
+        <DataTemplate x:Key="ChipTemplate" DataType="{x:Type vm:ChoiceOption}">
+            <Button x:Name="Btn" Style="{StaticResource ChipButtonStyle}" Command="{Binding SelectCommand}"
+                    AutomationProperties.Name="{Binding Name}">
+                <StackPanel Orientation="Horizontal">
+                    <Border Width="28" Height="20" CornerRadius="5" Background="{Binding Preview}"
+                            BorderBrush="#33000000" BorderThickness="1" />
+                    <TextBlock Text="{Binding Name}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter TargetName="Btn" Property="Style" Value="{StaticResource ChipButtonSelectedStyle}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SwatchTemplate" DataType="{x:Type vm:ColorOption}">
+            <Grid>
+                <Button Style="{StaticResource SwatchButtonStyle}" Background="{Binding Brush}"
+                        ToolTip="{Binding Name}" AutomationProperties.Name="{Binding Name}"
+                        Command="{Binding DataContext.SelectTintCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}" />
+                <Ellipse x:Name="Sel" Width="38" Height="38" Stroke="{StaticResource Brush.Accent}"
+                         StrokeThickness="2.5" IsHitTestVisible="False" Visibility="Collapsed" />
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter TargetName="Sel" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Opções contextuais da ferramenta: amostra de cor -->
+        <DataTemplate x:Key="OptionSwatchTemplate" DataType="{x:Type vm:ToolOption}">
+            <Grid Margin="2,0">
+                <Button Style="{StaticResource SwatchButtonStyle}" Background="{Binding Fill}" Width="22" Height="22"
+                        Margin="3" ToolTip="{Binding Name}" AutomationProperties.Name="{Binding Name}"
+                        Command="{Binding SelectCommand}" />
+                <Ellipse x:Name="Sel" Width="29" Height="29" Stroke="{StaticResource Brush.Accent}"
+                         StrokeThickness="2.2" IsHitTestVisible="False" Visibility="Collapsed" />
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter TargetName="Sel" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Espessura: uma bolinha do tamanho do traço -->
+        <DataTemplate x:Key="ThicknessTemplate" DataType="{x:Type vm:ToolOption}">
+            <Button x:Name="Btn" Style="{StaticResource ChipButtonStyle}" Command="{Binding SelectCommand}"
+                    ToolTip="{Binding Name}" AutomationProperties.Name="{Binding Name}" Padding="0" Margin="2,0"
+                    Width="34" Height="34">
+                <Ellipse Width="{Binding Size}" Height="{Binding Size}" Fill="{StaticResource Brush.Ink}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter TargetName="Btn" Property="Style" Value="{StaticResource ChipButtonSelectedStyle}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Negrito / itálico / sublinhado: o botão fica "ligado" quando o trecho selecionado já tem o estilo -->
+        <Style x:Key="BoldButtonStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsBold}" Value="True">
+                    <Setter Property="Template" Value="{StaticResource ChipSelectedTemplate}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ItalicButtonStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsItalic}" Value="True">
+                    <Setter Property="Template" Value="{StaticResource ChipSelectedTemplate}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="UnderlineButtonStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsUnderline}" Value="True">
+                    <Setter Property="Template" Value="{StaticResource ChipSelectedTemplate}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Opção em texto (direção da régua, camadas) -->
+        <DataTemplate x:Key="TextOptionTemplate" DataType="{x:Type vm:ToolOption}">
+            <Button x:Name="Btn" Style="{StaticResource ChipButtonStyle}" Command="{Binding SelectCommand}"
+                    AutomationProperties.Name="{Binding Name}" Margin="2,0" Padding="12,7">
+                <TextBlock Text="{Binding Name}" FontSize="12.5" Foreground="{StaticResource Brush.Ink}" />
+            </Button>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter TargetName="Btn" Property="Style" Value="{StaticResource ChipButtonSelectedStyle}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Aba de quadro -->
+        <DataTemplate x:Key="TabTemplate" DataType="{x:Type vm:BoardViewModel}">
+            <Border x:Name="Chip" CornerRadius="9" Margin="0,0,4,0" Background="Transparent">
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="TabBtn" Style="{StaticResource TabButtonStyle}" Content="{Binding TabTitle}"
+                            ToolTip="{Binding FilePath}"
+                            Command="{Binding DataContext.SelectTabCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}" />
+                    <Button Style="{StaticResource TabCloseStyle}" ToolTip="Fechar aba (Ctrl+W)"
+                            AutomationProperties.Name="Fechar aba"
+                            Command="{Binding DataContext.CloseTabCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}">
+                        <Path Data="{StaticResource Icon.Close}" Stroke="{StaticResource Brush.InkMuted}"
+                              StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Width="24" Height="24" Stretch="None" RenderTransformOrigin="0.5,0.5">
+                            <Path.RenderTransform>
+                                <ScaleTransform ScaleX="0.6" ScaleY="0.6" />
+                            </Path.RenderTransform>
+                        </Path>
+                    </Button>
+                </StackPanel>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource Brush.AccentSoft}" />
+                    <Setter TargetName="TabBtn" Property="Foreground" Value="{StaticResource Brush.Accent}" />
+                    <Setter TargetName="TabBtn" Property="FontWeight" Value="SemiBold" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Item de "Abrir recente" -->
+        <DataTemplate x:Key="RecentTemplate" DataType="{x:Type vm:RecentItem}">
+            <Button Style="{StaticResource MenuButtonStyle}" Content="{Binding Label}" ToolTip="{Binding Tooltip}"
+                    Command="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                    CommandParameter="{Binding Path}" />
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Barra de projetos: ações + abas -->
+        <Border Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12" Padding="8,6" CornerRadius="16"
+                Background="{StaticResource Brush.Surface}" Effect="{StaticResource Shadow.Soft}">
+            <StackPanel>
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding NewBoardCommand}"
+                                ToolTip="Novo quadro (Ctrl+N)" AutomationProperties.Name="Novo quadro">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.NewBoard}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                                <TextBlock Text="Novo" Style="{StaticResource BarLabel}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding OpenBoardCommand}"
+                                ToolTip="Abrir quadro (Ctrl+O)" AutomationProperties.Name="Abrir quadro">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.OpenBoard}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                                <TextBlock Text="Abrir" Style="{StaticResource BarLabel}" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="RecentButton" Style="{StaticResource TopBarButtonStyle}" Click="OnRecentClick"
+                                ToolTip="Abrir recente e favoritos" AutomationProperties.Name="Abrir recente">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.Recent}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                                <TextBlock Text="Recentes" Style="{StaticResource BarLabel}" />
+                                <Path Data="{StaticResource Icon.Chevron}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" Margin="2,0,-4,0" />
+                            </StackPanel>
+                        </Button>
+
+                        <Rectangle Width="1" Margin="6,6" Fill="{StaticResource Brush.Border}" />
+
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding SaveBoardCommand}"
+                                ToolTip="Salvar (Ctrl+S)" AutomationProperties.Name="Salvar">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.SaveBoard}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                                <TextBlock Text="Salvar" Style="{StaticResource BarLabel}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding SaveBoardAsCommand}"
+                                ToolTip="Salvar como... (Ctrl+Shift+S)" AutomationProperties.Name="Salvar como">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.SaveBoardAs}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                                <TextBlock Text="Salvar como…" Style="{StaticResource BarLabel}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Rectangle Width="1" Margin="6,6" Fill="{StaticResource Brush.Border}" />
+
+                        <Button x:Name="ExportButton" Style="{StaticResource TopBarButtonStyle}" Click="OnExportClick"
+                                ToolTip="Exportar e compartilhar" AutomationProperties.Name="Exportar">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.Export}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                                <TextBlock Text="Exportar" Style="{StaticResource BarLabel}" />
+                                <Path Data="{StaticResource Icon.Chevron}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" Margin="2,0,-4,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding PrintCommand}"
+                                ToolTip="Imprimir (Ctrl+P)" AutomationProperties.Name="Imprimir">
+                            <Path Data="{StaticResource Icon.Print}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                        </Button>
+
+                        <Rectangle Width="1" Margin="6,6" Fill="{StaticResource Brush.Border}" />
+
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding UndoCommand}"
+                                ToolTip="Desfazer (Ctrl+Z)" AutomationProperties.Name="Desfazer">
+                            <Path Data="{StaticResource Icon.Undo}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                        </Button>
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding RedoCommand}"
+                                ToolTip="Refazer (Ctrl+Y)" AutomationProperties.Name="Refazer">
+                            <Path Data="{StaticResource Icon.Redo}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                        </Button>
+
+                        <Rectangle Width="1" Margin="6,6" Fill="{StaticResource Brush.Border}" />
+
+                        <Button x:Name="MoreButton" Style="{StaticResource TopBarButtonStyle}" Click="OnMoreClick"
+                                ToolTip="Mais ações do quadro" AutomationProperties.Name="Mais ações">
+                            <Path Data="{StaticResource Icon.More}" Stroke="{StaticResource Brush.InkMuted}"
+                                  Style="{StaticResource BarIcon}" StrokeThickness="3" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Zoom -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding ZoomOutCommand}"
+                                ToolTip="Reduzir zoom (ou Ctrl + roda do mouse)" AutomationProperties.Name="Reduzir zoom">
+                            <Path Data="{StaticResource Icon.Minus}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                        </Button>
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding ZoomResetCommand}"
+                                ToolTip="Voltar para 100%" AutomationProperties.Name="Zoom" MinWidth="58">
+                            <TextBlock Text="{Binding ActiveBoard.ZoomText}" Style="{StaticResource BarLabel}"
+                                       Margin="0" HorizontalAlignment="Center" />
+                        </Button>
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding ZoomInCommand}"
+                                ToolTip="Aumentar zoom (ou Ctrl + roda do mouse)" AutomationProperties.Name="Aumentar zoom">
+                            <Path Data="{StaticResource Icon.Plus}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Rectangle Height="1" Margin="2,4,2,4" Fill="{StaticResource Brush.Border}" />
+
+                <!-- Abas dos quadros abertos -->
+                <StackPanel Orientation="Horizontal">
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                  MaxWidth="1500">
+                        <ItemsControl ItemsSource="{Binding Tabs}" ItemTemplate="{StaticResource TabTemplate}"
+                                      Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding NewBoardCommand}"
+                            ToolTip="Novo quadro em nova aba (Ctrl+T)" AutomationProperties.Name="Nova aba" Margin="2,0,0,0">
+                        <Path Data="{StaticResource Icon.Plus}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Menu: abrir recente -->
+        <Popup x:Name="RecentPopup" PlacementTarget="{Binding ElementName=RecentButton}" Placement="Bottom"
+               StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+            <Border Margin="14" Padding="6" Background="{StaticResource Brush.Surface}" CornerRadius="14"
+                    Effect="{StaticResource Shadow.Soft}" MinWidth="260" Button.Click="OnPopupButtonClick">
+                <StackPanel>
+                    <TextBlock Text="Nenhum quadro recente ainda" Margin="12,8" FontSize="12.5"
+                               Foreground="{StaticResource Brush.InkMuted}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasRecent}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <ItemsControl ItemsSource="{Binding RecentItems}" ItemTemplate="{StaticResource RecentTemplate}"
+                                  Focusable="False" />
+                    <StackPanel Visibility="{Binding HasRecent, Converter={StaticResource BoolToVis}}">
+                        <Rectangle Height="1" Margin="8,4" Fill="{StaticResource Brush.Border}" />
+                        <Button Style="{StaticResource MenuButtonStyle}" Content="Limpar recentes"
+                                Command="{Binding ClearRecentCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- Menu: exportar e compartilhar -->
+        <Popup x:Name="ExportPopup" PlacementTarget="{Binding ElementName=ExportButton}" Placement="Bottom"
+               StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+            <Border Margin="14" Padding="6" Background="{StaticResource Brush.Surface}" CornerRadius="14"
+                    Effect="{StaticResource Shadow.Soft}" MinWidth="280" Button.Click="OnPopupButtonClick">
+                <StackPanel>
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="Imagem PNG — quadro completo"
+                            Command="{Binding ExportPngCommand}" />
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="Imagem PNG — só a superfície"
+                            Command="{Binding ExportSurfacePngCommand}" />
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="Documento PDF"
+                            Command="{Binding ExportPdfCommand}" />
+                    <Rectangle Height="1" Margin="8,4" Fill="{StaticResource Brush.Border}" />
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="Compartilhar pacote (.wbpack)…"
+                            Command="{Binding ShareCommand}" />
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- Menu: mais ações -->
+        <Popup x:Name="MorePopup" PlacementTarget="{Binding ElementName=MoreButton}" Placement="Bottom"
+               StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+            <Border Margin="14" Padding="6" Background="{StaticResource Brush.Surface}" CornerRadius="14"
+                    Effect="{StaticResource Shadow.Soft}" MinWidth="250" Button.Click="OnPopupButtonClick">
+                <StackPanel>
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="Renomear   (F2)"
+                            Command="{Binding RenameBoardCommand}" />
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="Duplicar quadro"
+                            Command="{Binding DuplicateBoardCommand}" />
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="{Binding FavoriteMenuText}"
+                            Command="{Binding ToggleFavoriteCommand}" />
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="Mostrar na pasta"
+                            Command="{Binding ShowInFolderCommand}" />
+                    <Rectangle Height="1" Margin="8,4" Fill="{StaticResource Brush.Border}" />
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="Fechar aba   (Ctrl+W)"
+                            Command="{Binding CloseTabCommand}" />
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- Barra de ferramentas lateral -->
+        <Border Grid.Row="1" Grid.Column="0" Margin="0,0,12,0" Padding="8,10" VerticalAlignment="Center"
+                Background="{StaticResource Brush.Surface}" CornerRadius="20"
+                Effect="{StaticResource Shadow.Soft}">
+            <StackPanel>
+                <ItemsControl ItemsSource="{Binding Tools}" ItemTemplate="{StaticResource ToolTemplate}"
+                              Focusable="False" />
+
+                <!-- Painel de tema e aparência do quadro (aberto pelo botão de ajustes, canto inferior esquerdo) -->
+                <Popup IsOpen="{Binding IsPaletteOpen, Mode=TwoWay}" PlacementTarget="{Binding ElementName=PaletteButton}"
+                       Placement="Right" HorizontalOffset="-4" StaysOpen="False"
+                       AllowsTransparency="True" PopupAnimation="Fade">
+                    <Border Margin="16" Padding="12" Background="{StaticResource Brush.Surface}" CornerRadius="16"
+                            Effect="{StaticResource Shadow.Soft}">
+                        <StackPanel Width="286">
+                            <TextBlock Text="Tema (fundo da janela)" FontWeight="SemiBold" FontSize="13"
+                                       Foreground="{StaticResource Brush.Ink}" Margin="4,0,0,4" />
+                            <ItemsControl ItemsSource="{Binding ThemeOptions}"
+                                          ItemTemplate="{StaticResource ChipTemplate}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="2" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+
+                            <TextBlock Text="Moldura" FontWeight="SemiBold" FontSize="13"
+                                       Foreground="{StaticResource Brush.Ink}" Margin="4,12,0,4" />
+                            <ItemsControl ItemsSource="{Binding FrameOptions}"
+                                          ItemTemplate="{StaticResource ChipTemplate}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="2" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+
+                            <TextBlock Text="Superfície" FontWeight="SemiBold" FontSize="13"
+                                       Foreground="{StaticResource Brush.Ink}" Margin="4,12,0,4" />
+                            <ItemsControl ItemsSource="{Binding SurfaceOptions}"
+                                          ItemTemplate="{StaticResource ChipTemplate}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="2" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+
+                            <StackPanel Visibility="{Binding ActiveBoard.IsWhiteboard, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Cor do quadro branco" FontWeight="SemiBold" FontSize="13"
+                                           Foreground="{StaticResource Brush.Ink}" Margin="4,12,0,4" />
+                                <ItemsControl ItemsSource="{Binding TintColors}"
+                                              ItemTemplate="{StaticResource SwatchTemplate}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Popup>
+            </StackPanel>
+        </Border>
+
+        <!-- Ajustes: tema e aparência do quadro -->
+        <Border Grid.Row="1" Grid.Column="0" Margin="0,0,12,0" Padding="8" VerticalAlignment="Bottom"
+                Background="{StaticResource Brush.Surface}" CornerRadius="20"
+                Effect="{StaticResource Shadow.Soft}">
+            <Button x:Name="PaletteButton" Style="{StaticResource ToolButtonStyle}" Margin="0"
+                    Command="{Binding TogglePaletteCommand}" ToolTip="Tema e aparência do quadro"
+                    AutomationProperties.Name="Tema e aparência do quadro">
+                <Path Data="{StaticResource Icon.Settings}" Stroke="{StaticResource Brush.InkMuted}"
+                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      StrokeLineJoin="Round" Stretch="None" Width="24" Height="24" />
+            </Button>
+        </Border>
+
+        <!-- Área do quadro: moldura + superfície + bandeja (segue o quadro da aba ativa) -->
+        <Grid Grid.Row="1" Grid.Column="1" VerticalAlignment="Stretch">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" x:Name="BoardFrameRoot">
+                <Border x:Name="BoardFrameBorder" CornerRadius="8" Background="{Binding ActiveBoard.FrameBrush}"
+                        BorderBrush="#40000000" BorderThickness="1" Padding="{Binding ActiveBoard.FrameThickness}"
+                        Effect="{StaticResource Shadow.Soft}">
+                    <Border x:Name="BoardSurfaceBorder" CornerRadius="2" Background="{Binding ActiveBoard.SurfaceBrush}"
+                            BorderBrush="#55000000" BorderThickness="1" ClipToBounds="True">
+                        <Grid ClipToBounds="True">
+                            <!-- Giz apagado (só lousas) -->
+                            <Grid Visibility="{Binding ActiveBoard.IsChalkboard, Converter={StaticResource BoolToVis}}"
+                                  IsHitTestVisible="False">
+                                <Ellipse Width="520" Height="150" Fill="#0FFFFFFF" HorizontalAlignment="Left"
+                                         VerticalAlignment="Top" Margin="60,70,0,0">
+                                    <Ellipse.RenderTransform>
+                                        <RotateTransform Angle="-8" />
+                                    </Ellipse.RenderTransform>
+                                    <Ellipse.Effect>
+                                        <BlurEffect Radius="40" />
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                                <Ellipse Width="420" Height="120" Fill="#0BFFFFFF" HorizontalAlignment="Right"
+                                         VerticalAlignment="Bottom" Margin="0,0,90,110">
+                                    <Ellipse.RenderTransform>
+                                        <RotateTransform Angle="6" />
+                                    </Ellipse.RenderTransform>
+                                    <Ellipse.Effect>
+                                        <BlurEffect Radius="40" />
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                            </Grid>
+
+                            <!-- Brilho do quadro branco -->
+                            <Border IsHitTestVisible="False"
+                                    Visibility="{Binding ActiveBoard.IsWhiteboard, Converter={StaticResource BoolToVis}}">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#30FFFFFF" Offset="0" />
+                                        <GradientStop Color="#00FFFFFF" Offset="0.35" />
+                                        <GradientStop Color="#18FFFFFF" Offset="0.55" />
+                                        <GradientStop Color="#0C000000" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+
+                            <!-- Iluminação e vinheta (lousas e veludo) -->
+                            <Border IsHitTestVisible="False" Opacity="{Binding ActiveBoard.VignetteOpacity}">
+                                <Border.Background>
+                                    <RadialGradientBrush GradientOrigin="0.5,0.35" Center="0.5,0.4"
+                                                         RadiusX="0.85" RadiusY="0.85">
+                                        <GradientStop Color="#22FFFFFF" Offset="0" />
+                                        <GradientStop Color="#00000000" Offset="0.55" />
+                                        <GradientStop Color="#55000000" Offset="1" />
+                                    </RadialGradientBrush>
+                                </Border.Background>
+                            </Border>
+
+                            <StackPanel x:Name="HintPanel" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Opacity="0.6" IsHitTestVisible="False"
+                                        Visibility="{Binding ActiveBoard.IsEmpty, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Seu quadro está pronto" FontSize="22" FontWeight="SemiBold"
+                                           Foreground="{Binding ActiveBoard.HintBrush}" HorizontalAlignment="Center" />
+                                <TextBlock Text="Escolha uma ferramenta ao lado e comece a desenhar."
+                                           FontSize="13" Foreground="{Binding ActiveBoard.HintBrush}" Margin="0,6,0,0"
+                                           HorizontalAlignment="Center" />
+                            </StackPanel>
+
+                            <!-- Área de trabalho: desenha os elementos e trata o mouse conforme a ferramenta -->
+                            <ctl:BoardCanvas x:Name="BoardArea" Board="{Binding ActiveBoard}" Tool="{Binding ToolState}" />
+
+                            <Border x:Name="StatusPill" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16"
+                                    Padding="14,7" CornerRadius="14" Background="{StaticResource Brush.Surface}"
+                                    Effect="{StaticResource Shadow.Subtle}" IsHitTestVisible="False">
+                                <TextBlock Text="{Binding StatusText}" FontSize="12"
+                                           Foreground="{StaticResource Brush.Ink}" />
+                            </Border>
+
+                            <!-- Opções da ferramenta (cor, espessura, tamanho...) -->
+                            <Border x:Name="ToolOptionsBar" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                    Margin="16" Padding="12,8" CornerRadius="16" Background="{StaticResource Brush.Surface}"
+                                    Effect="{StaticResource Shadow.Soft}"
+                                    Visibility="{Binding HasToolOptions, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ItemsControl ItemsSource="{Binding InkOptions}" ItemTemplate="{StaticResource OptionSwatchTemplate}"
+                                                  Focusable="False" VerticalAlignment="Center"
+                                                  Visibility="{Binding ShowInk, Converter={StaticResource BoolToVis}}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+                                    <ItemsControl ItemsSource="{Binding StickyColorOptions}" ItemTemplate="{StaticResource OptionSwatchTemplate}"
+                                                  Focusable="False" VerticalAlignment="Center"
+                                                  Visibility="{Binding ShowStickyColors, Converter={StaticResource BoolToVis}}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+                                    <ItemsControl ItemsSource="{Binding PinColorOptions}" ItemTemplate="{StaticResource OptionSwatchTemplate}"
+                                                  Focusable="False" VerticalAlignment="Center"
+                                                  Visibility="{Binding ShowPinColors, Converter={StaticResource BoolToVis}}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+
+                                    <Rectangle Width="1" Margin="10,2" Fill="{StaticResource Brush.Border}"
+                                               Visibility="{Binding ShowThickness, Converter={StaticResource BoolToVis}}" />
+                                    <ItemsControl ItemsSource="{Binding ThicknessOptions}" ItemTemplate="{StaticResource ThicknessTemplate}"
+                                                  Focusable="False" VerticalAlignment="Center"
+                                                  Visibility="{Binding ShowThickness, Converter={StaticResource BoolToVis}}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+
+                                    <!-- Espessura fina: botões - e + (as teclas - e + fazem o mesmo) -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0"
+                                                Visibility="{Binding ShowThickness, Converter={StaticResource BoolToVis}}">
+                                        <Button Style="{StaticResource ChipButtonStyle}" Command="{Binding ThinnerCommand}"
+                                                Width="30" Height="30" Padding="0" Margin="2,0" ToolTip="Afinar (tecla -)"
+                                                AutomationProperties.Name="Afinar traço">
+                                            <Path Data="{StaticResource Icon.Minus}" Stroke="{StaticResource Brush.Ink}" StrokeThickness="1.8"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="None" Width="24" Height="24" />
+                                        </Button>
+                                        <TextBlock Text="{Binding ThicknessText}" FontSize="13" FontWeight="SemiBold" MinWidth="30"
+                                                   TextAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource Brush.Ink}" />
+                                        <Button Style="{StaticResource ChipButtonStyle}" Command="{Binding ThickerCommand}"
+                                                Width="30" Height="30" Padding="0" Margin="2,0" ToolTip="Engrossar (tecla +)"
+                                                AutomationProperties.Name="Engrossar traço">
+                                            <Path Data="{StaticResource Icon.Plus}" Stroke="{StaticResource Brush.Ink}" StrokeThickness="1.8"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="None" Width="24" Height="24" />
+                                        </Button>
+                                    </StackPanel>
+
+                                    <!-- Texto: fonte, tamanho (A − +), negrito, itálico, sublinhado e cor.
+                                         Durante a edição valem só para o trecho selecionado. Os botões não pegam o foco
+                                         do teclado, para a seleção no texto continuar viva. -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,0,0"
+                                                Visibility="{Binding ShowTextFormat, Converter={StaticResource BoolToVis}}">
+                                        <ComboBox ItemsSource="{Binding FontFamilies}" SelectedItem="{Binding ToolState.FontFamily, Mode=TwoWay}"
+                                                  Width="170" Height="34" VerticalAlignment="Center"
+                                                  VerticalContentAlignment="Center" FontSize="14"
+                                                  ToolTip="Fonte" AutomationProperties.Name="Fonte">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" FontFamily="{Binding}" FontSize="15" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+
+                                        <Rectangle Width="1" Margin="10,2" Fill="{StaticResource Brush.Border}" />
+
+                                        <!-- Tamanho da letra: A com − e + -->
+                                        <Button Style="{StaticResource ChipButtonStyle}" Command="{Binding TextSmallerCommand}" Focusable="False"
+                                                Width="30" Height="30" Padding="0" Margin="2,0" ToolTip="Diminuir a letra"
+                                                AutomationProperties.Name="Diminuir letra">
+                                            <Path Data="{StaticResource Icon.Minus}" Stroke="{StaticResource Brush.Ink}" StrokeThickness="1.8"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="None" Width="24" Height="24" />
+                                        </Button>
+                                        <TextBlock Text="A" FontSize="20" FontWeight="SemiBold" Margin="4,0" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource Brush.Ink}" ToolTip="Tamanho da letra" />
+                                        <Button Style="{StaticResource ChipButtonStyle}" Command="{Binding TextLargerCommand}" Focusable="False"
+                                                Width="30" Height="30" Padding="0" Margin="2,0" ToolTip="Aumentar a letra"
+                                                AutomationProperties.Name="Aumentar letra">
+                                            <Path Data="{StaticResource Icon.Plus}" Stroke="{StaticResource Brush.Ink}" StrokeThickness="1.8"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="None" Width="24" Height="24" />
+                                        </Button>
+
+                                        <Rectangle Width="1" Margin="10,2" Fill="{StaticResource Brush.Border}" />
+
+                                        <!-- Negrito, itálico, sublinhado -->
+                                        <Button Style="{StaticResource BoldButtonStyle}" Command="{Binding ToggleBoldCommand}" Focusable="False"
+                                                Width="32" Height="32" Padding="0" Margin="2,0" ToolTip="Negrito (Ctrl+B)"
+                                                AutomationProperties.Name="Negrito">
+                                            <TextBlock Text="B" FontWeight="Bold" FontSize="16" Foreground="{StaticResource Brush.Ink}" />
+                                        </Button>
+                                        <Button Style="{StaticResource ItalicButtonStyle}" Command="{Binding ToggleItalicCommand}" Focusable="False"
+                                                Width="32" Height="32" Padding="0" Margin="2,0" ToolTip="Itálico (Ctrl+I)"
+                                                AutomationProperties.Name="Itálico">
+                                            <TextBlock Text="I" FontStyle="Italic" FontSize="16" FontFamily="Georgia" Foreground="{StaticResource Brush.Ink}" />
+                                        </Button>
+                                        <Button Style="{StaticResource UnderlineButtonStyle}" Command="{Binding ToggleUnderlineCommand}" Focusable="False"
+                                                Width="32" Height="32" Padding="0" Margin="2,0" ToolTip="Sublinhado (Ctrl+U)"
+                                                AutomationProperties.Name="Sublinhado">
+                                            <TextBlock Text="U" FontSize="16" Foreground="{StaticResource Brush.Ink}">
+                                                <TextBlock.TextDecorations>
+                                                    <TextDecorationCollection>
+                                                        <TextDecoration Location="Underline" />
+                                                    </TextDecorationCollection>
+                                                </TextBlock.TextDecorations>
+                                            </TextBlock>
+                                        </Button>
+
+                                        <!-- Cor da letra: abre a paleta -->
+                                        <Button x:Name="TextColorButton" Style="{StaticResource ChipButtonStyle}" Click="OnTextColorClick" Focusable="False"
+                                                Width="36" Height="32" Padding="0" Margin="6,0,0,0" ToolTip="Cor da letra"
+                                                AutomationProperties.Name="Cor da letra">
+                                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                <TextBlock Text="A" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center"
+                                                           Foreground="{StaticResource Brush.Ink}" />
+                                                <Rectangle Height="4" Width="20" RadiusX="1" RadiusY="1" Margin="0,1,0,0"
+                                                           Fill="{Binding TextColorBrush}" Stroke="#33000000" StrokeThickness="0.5" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Popup x:Name="TextColorPopup" PlacementTarget="{Binding ElementName=TextColorButton}" Placement="Top"
+                                               StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade" Focusable="False">
+                                            <Border Margin="12" Padding="10,8" Background="{StaticResource Brush.Surface}" CornerRadius="14"
+                                                    Effect="{StaticResource Shadow.Soft}" Button.Click="OnPopupButtonClick">
+                                                <ItemsControl ItemsSource="{Binding TextColorOptions}" ItemTemplate="{StaticResource OptionSwatchTemplate}"
+                                                              Focusable="False">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Orientation="Horizontal" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                </ItemsControl>
+                                            </Border>
+                                        </Popup>
+                                    </StackPanel>
+
+                                    <!-- Borracha: tamanho (também com as teclas - e +) -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                Visibility="{Binding ShowEraser, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="Borracha" FontSize="12.5" Foreground="{StaticResource Brush.InkMuted}"
+                                                   VerticalAlignment="Center" Margin="4,0,8,0" />
+                                        <Button Style="{StaticResource ChipButtonStyle}" Command="{Binding EraserSmallerCommand}"
+                                                Width="34" Height="34" Padding="0" Margin="2,0" ToolTip="Diminuir (tecla -)"
+                                                AutomationProperties.Name="Diminuir borracha">
+                                            <Path Data="{StaticResource Icon.Minus}" Stroke="{StaticResource Brush.Ink}" StrokeThickness="1.8"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="None" Width="24" Height="24" />
+                                        </Button>
+                                        <TextBlock Text="{Binding EraserSizeText}" FontSize="13" FontWeight="SemiBold" MinWidth="34"
+                                                   TextAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource Brush.Ink}" />
+                                        <Button Style="{StaticResource ChipButtonStyle}" Command="{Binding EraserBiggerCommand}"
+                                                Width="34" Height="34" Padding="0" Margin="2,0" ToolTip="Aumentar (tecla +)"
+                                                AutomationProperties.Name="Aumentar borracha">
+                                            <Path Data="{StaticResource Icon.Plus}" Stroke="{StaticResource Brush.Ink}" StrokeThickness="1.8"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="None" Width="24" Height="24" />
+                                        </Button>
+                                    </StackPanel>
+
+                                    <!-- Régua: horizontal ou vertical -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                Visibility="{Binding ShowRuler, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="Régua" FontSize="12.5" Foreground="{StaticResource Brush.InkMuted}"
+                                                   VerticalAlignment="Center" Margin="4,0,8,0" />
+                                        <ItemsControl ItemsSource="{Binding RulerOptions}" ItemTemplate="{StaticResource TextOptionTemplate}"
+                                                      Focusable="False" VerticalAlignment="Center">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                    </StackPanel>
+
+                                    <!-- Camadas: qual elemento fica na frente -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                Visibility="{Binding ShowLayers, Converter={StaticResource BoolToVis}}">
+                                        <Rectangle Width="1" Margin="10,2" Fill="{StaticResource Brush.Border}"
+                                                   Visibility="{Binding ShowRuler, Converter={StaticResource BoolToVis}}" />
+                                        <TextBlock Text="Camada" FontSize="12.5" Foreground="{StaticResource Brush.InkMuted}"
+                                                   VerticalAlignment="Center" Margin="4,0,8,0" />
+                                        <ItemsControl ItemsSource="{Binding LayerOptions}" ItemTemplate="{StaticResource TextOptionTemplate}"
+                                                      Focusable="False" VerticalAlignment="Center">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Border>
+
+                <!-- Cantoneiras -->
+                <Border Width="{Binding ActiveBoard.CapSize}" Height="{Binding ActiveBoard.CapSize}" CornerRadius="4"
+                        Background="{Binding ActiveBoard.CapBrush}" HorizontalAlignment="Left" VerticalAlignment="Top"
+                        IsHitTestVisible="False" />
+                <Border Width="{Binding ActiveBoard.CapSize}" Height="{Binding ActiveBoard.CapSize}" CornerRadius="4"
+                        Background="{Binding ActiveBoard.CapBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        IsHitTestVisible="False" />
+                <Border Width="{Binding ActiveBoard.CapSize}" Height="{Binding ActiveBoard.CapSize}" CornerRadius="4"
+                        Background="{Binding ActiveBoard.CapBrush}" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                        IsHitTestVisible="False" />
+                <Border Width="{Binding ActiveBoard.CapSize}" Height="{Binding ActiveBoard.CapSize}" CornerRadius="4"
+                        Background="{Binding ActiveBoard.CapBrush}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                        IsHitTestVisible="False" />
+            </Grid>
+
+            <!-- Bandeja de canetas -->
+            <Border Grid.Row="1" Width="220" Height="9" Margin="0,-2,0,0" HorizontalAlignment="Center"
+                    CornerRadius="0,0,6,6" Background="{Binding ActiveBoard.FrameBrush}" BorderBrush="#40000000"
+                    BorderThickness="1,0,1,1" Effect="{StaticResource Shadow.Subtle}" />
+        </Grid>
+    </Grid>
+</Window>
