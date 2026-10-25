@@ -13,7 +13,21 @@ Quadro branco digital para Windows 11 (C#, WPF, .NET 8, MVVM simples).
 dotnet run
 ```
 
-## Gerar o executável (arquivo único, sem precisar do .NET instalado)
+## Instalador (recomendado para distribuir)
+
+O instalador (`installer/`, feito com [Inno Setup 6](https://jrsoftware.org/isinfo.php)) instala o app e, **antes dele**,
+o .NET 8 Desktop Runtime caso o computador ainda não tenha (baixa da Microsoft na hora, em silêncio).
+Fica com ~4 MB porque o app vai sem o .NET dentro.
+
+```
+winget install JRSoftware.InnoSetup
+powershell -File installer\build-installer.ps1 -Version 0.1.0
+```
+
+O resultado fica em `installer\output\WhiteboardSimulator-Setup-<versão>.exe`. Também aceita instalação silenciosa
+(`/VERYSILENT`) e, sem administrador, `/CURRENTUSER` (nesse modo não instala o runtime).
+
+## Gerar o executável único com o .NET embutido (~156 MB, sem instalação)
 
 ```
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish

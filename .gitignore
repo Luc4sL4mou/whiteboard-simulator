@@ -10,3 +10,7 @@ publish/
 
 # Arquivos temporários do WPF
 *_wpftmp.csproj
+
+# Instalador gerado
+publish-fd/
+installer/output/
