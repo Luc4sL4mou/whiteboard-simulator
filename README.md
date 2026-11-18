@@ -39,6 +39,8 @@ O diferencial do projeto: **um timer Pomodoro nativo, integrado ao quadro**, par
 
 O botão **Widget** (barra de cima, ao lado do zoom) transforma o quadro numa janela sem bordas que mostra **só o quadro**, sem a interface nem o fundo da janela, para deixar sobre a área de trabalho enquanto você usa outros programas.
 
+![Modo widget: só o quadro sobre a área de trabalho](docs/widget.png)
+
 - **O mesmo quadro, só que menor:** o conteúdo é desenhado em escala. Nada é cortado nem muda de lugar, e dá para continuar desenhando (troque de ferramenta pelos atalhos de teclado).
 - **Barra discreta:** fica invisível e aparece quando o mouse passa no topo do quadro. Nela dá para **arrastar** a janela, **fixar no topo** (acima dos outros programas), **copiar imagem** e voltar à janela completa (**X**).
 - **Copiar imagem:** copia só o quadro (moldura + conteúdo), em tamanho cheio, para a área de transferência. É só colar com `Ctrl+V`.
