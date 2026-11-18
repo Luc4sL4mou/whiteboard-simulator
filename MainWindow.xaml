@@ -194,7 +194,7 @@
         </DataTemplate>
     </Window.Resources>
 
-    <Grid Margin="12">
+    <Grid x:Name="RootGrid" Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -204,8 +204,47 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
+        <!-- Barra do modo widget (só nele): flutua sobre o topo do quadro e só aparece com o mouse em cima -->
+        <Border x:Name="WidgetBar" Grid.Row="1" Grid.Column="1" Panel.ZIndex="10" VerticalAlignment="Top"
+                Margin="10" Padding="8,2" CornerRadius="12"
+                Background="{StaticResource Brush.Surface}" Visibility="Collapsed"
+                MouseLeftButtonDown="OnWidgetBarMouseDown" Cursor="SizeAll" ToolTip="Arraste para mover · duplo clique ajusta ao tamanho do monitor">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Opacity" Value="0" />
+                    <Style.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Opacity" Value="1" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Style="{StaticResource TopBarButtonStyle}" Click="OnWidgetClick" Cursor="Arrow"
+                        ToolTip="Voltar à janela completa" AutomationProperties.Name="Sair do modo widget">
+                    <Path Data="{StaticResource Icon.Close}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                </Button>
+                <Button DockPanel.Dock="Right" Style="{StaticResource TopBarButtonStyle}" Click="OnWidgetCopyClick" Cursor="Arrow"
+                        ToolTip="Copia só o quadro (moldura e conteúdo) como imagem; cole com Ctrl+V" AutomationProperties.Name="Copiar imagem do quadro">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource Icon.Image}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                        <TextBlock x:Name="WidgetCopyLabel" Text="Copiar imagem" Style="{StaticResource BarLabel}" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="WidgetTopmostButton" DockPanel.Dock="Right" Style="{StaticResource TopBarButtonStyle}"
+                        Click="OnWidgetTopmostClick" Cursor="Arrow" AutomationProperties.Name="Fixar no topo">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource Icon.Pin}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                        <TextBlock x:Name="WidgetTopmostLabel" Text="Fixar no topo" Style="{StaticResource BarLabel}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="{Binding WindowTitle}" Style="{StaticResource BarLabel}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
+
         <!-- Barra de projetos: ações + abas -->
-        <Border Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12" Padding="8,6" CornerRadius="16"
+        <Border x:Name="TopBar" Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12" Padding="8,6" CornerRadius="16"
                 Background="{StaticResource Brush.Surface}" Effect="{StaticResource Shadow.Soft}">
             <StackPanel>
                 <Grid>
@@ -285,8 +324,16 @@
                         </Button>
                     </StackPanel>
 
-                    <!-- Zoom -->
+                    <!-- Modo widget + zoom -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource TopBarButtonStyle}" Click="OnWidgetClick"
+                                ToolTip="Modo widget: o quadro vira uma janelinha no canto da tela" AutomationProperties.Name="Modo widget">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.Widget}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
+                                <TextBlock Text="Widget" Style="{StaticResource BarLabel}" />
+                            </StackPanel>
+                        </Button>
+                        <Rectangle Width="1" Margin="6,6" Fill="{StaticResource Brush.Border}" />
                         <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding ZoomOutCommand}"
                                 ToolTip="Reduzir zoom (ou Ctrl + roda do mouse)" AutomationProperties.Name="Reduzir zoom">
                             <Path Data="{StaticResource Icon.Minus}" Stroke="{StaticResource Brush.InkMuted}" Style="{StaticResource BarIcon}" />
@@ -398,7 +445,7 @@
 
         <!-- Barra de ferramentas lateral -->
         <!-- Coluna esquerda: ferramentas (encolhem se faltar altura) + Pomodoro e ajustes embaixo -->
-        <Grid Grid.Row="1" Grid.Column="0" Margin="0,0,12,0">
+        <Grid x:Name="SidePanel" Grid.Row="1" Grid.Column="0" Margin="0,0,12,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
@@ -504,7 +551,7 @@
         </Grid>
 
         <!-- Área do quadro: moldura + superfície + bandeja (segue o quadro da aba ativa) -->
-        <Grid Grid.Row="1" Grid.Column="1" VerticalAlignment="Stretch">
+        <Grid x:Name="BoardColumn" Grid.Row="1" Grid.Column="1" VerticalAlignment="Stretch">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
@@ -810,7 +857,7 @@
             </Grid>
 
             <!-- Bandeja de canetas -->
-            <Border Grid.Row="1" Width="220" Height="9" Margin="0,-2,0,0" HorizontalAlignment="Center"
+            <Border x:Name="PenTray" Grid.Row="1" Width="220" Height="9" Margin="0,-2,0,0" HorizontalAlignment="Center"
                     CornerRadius="0,0,6,6" Background="{Binding ActiveBoard.FrameBrush}" BorderBrush="#40000000"
                     BorderThickness="1,0,1,1" Effect="{StaticResource Shadow.Subtle}" />
         </Grid>

@@ -35,19 +35,213 @@ public partial class MainWindow : Window, IBoardView
         BoardArea.EditorFormatChanged += (_, state) => vm.OnEditorFormatChanged(state);
 
         // A barra de título acompanha o tema: refaz as cores quando o tema muda.
-        SourceInitialized += (_, _) => ApplyTitleBarTheme();
+        SourceInitialized += (_, _) =>
+        {
+            ApplyTitleBarTheme();
+            HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WidgetHook);
+        };
         vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.TitleBarColor)) ApplyTitleBarTheme();
             if (e.PropertyName == nameof(MainViewModel.IsPomodoroOpen)) UpdatePomodoroWindow();
         };
         vm.Pomodoro.CloseRequested += () => vm.IsPomodoroOpen = false;
+        BoardColumn.SizeChanged += (_, _) => FitWidgetBoard();
 
         // Depois que a janela aparece, oferece restaurar quadros de uma sessão que caiu.
         Loaded += (_, _) => Dispatcher.InvokeAsync(vm.OfferRecovery, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private MainViewModel ViewModel => (MainViewModel)DataContext;
+
+    // ---- Modo widget: o quadro vira uma janelinha sem moldura no canto da tela ----
+
+    private bool _isWidget;
+    private Rect _normalBounds;
+    private WindowState _normalState;
+
+    public bool IsWidget => _isWidget;
+
+    private void OnWidgetClick(object sender, RoutedEventArgs e) => ToggleWidget();
+
+    private void OnWidgetTopmostClick(object sender, RoutedEventArgs e)
+    {
+        Topmost = !Topmost;
+        WidgetTopmostLabel.Text = Topmost ? "Soltar do topo" : "Fixar no topo";
+    }
+
+    /// <summary>Print só do quadro: sem a janela, a barra do widget ou o que estiver atrás.</summary>
+    private void OnWidgetCopyClick(object sender, RoutedEventArgs e)
+    {
+        // Opaco: a maioria dos programas cola o fundo transparente da área de transferência como preto.
+        Clipboard.SetImage(RenderBoard(includeFrame: true, scale: 2, opaque: true));
+        WidgetCopiedHint();
+    }
+
+    private async void WidgetCopiedHint()
+    {
+        WidgetCopyLabel.Text = "Copiado!";
+        await Task.Delay(1500);
+        WidgetCopyLabel.Text = "Copiar imagem";
+    }
+
+    private void OnWidgetBarMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            FitWidgetToCurrentScreen();     // duplo clique: tamanho padrão do monitor onde está
+            return;
+        }
+        try { DragMove(); } catch (InvalidOperationException) { /* soltou o botão antes de começar */ }
+    }
+
+    public void ToggleWidget()
+    {
+        if (_isFullScreen) ToggleFullScreen();
+        _isWidget = !_isWidget;
+        var full = _isWidget ? Visibility.Collapsed : Visibility.Visible;
+        TopBar.Visibility = SidePanel.Visibility = PenTray.Visibility = full;
+        WidgetBar.Visibility = _isWidget ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_isWidget)
+        {
+            _normalState = WindowState;
+            _normalBounds = RestoreBounds;
+            var screen = System.Windows.Forms.Screen.FromHandle(Hwnd);   // o monitor onde a janela está agora
+            // O quadro guarda o tamanho atual e só é desenhado menor: nada é cortado nem muda de lugar.
+            double w = BoardFrameRoot.ActualWidth, h = BoardFrameRoot.ActualHeight;
+            BoardFrameRoot.Width = w;
+            BoardFrameRoot.Height = h;
+
+            // A janela é só o quadro: sem margem, e o fundo vira a cor da moldura (cobre os cantos arredondados).
+            RootGrid.Margin = new Thickness(0);
+            SetCurrentValue(BackgroundProperty, BoardFrameBorder.Background);
+
+            WindowState = WindowState.Normal;
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.CanResizeWithGrip;
+            ShowInTaskbar = false;
+            // Sem isso a borda de redimensionar ocupa ~7px de cada lado, com fundo aparecendo.
+            System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 0,
+                GlassFrameThickness = new Thickness(0),
+                ResizeBorderThickness = new Thickness(6),
+                UseAeroCaptionButtons = false
+            });
+            MinWidth = 300;
+            MinHeight = 300 * h / w;
+            PlaceWidgetOn(screen);
+        }
+        else
+        {
+            RootGrid.Margin = new Thickness(12);
+            GetBindingExpression(BackgroundProperty)?.UpdateTarget();
+            BoardFrameRoot.LayoutTransform = Transform.Identity;
+            BoardFrameRoot.ClearValue(WidthProperty);
+            BoardFrameRoot.ClearValue(HeightProperty);
+            Topmost = false;
+            WidgetTopmostLabel.Text = "Fixar no topo";
+            System.Windows.Shell.WindowChrome.SetWindowChrome(this, null);
+
+            WindowStyle = WindowStyle.SingleBorderWindow;
+            ResizeMode = ResizeMode.CanResize;
+            ShowInTaskbar = true;
+            MinWidth = 1100;
+            MinHeight = 700;
+            Left = _normalBounds.Left;
+            Top = _normalBounds.Top;
+            Width = _normalBounds.Width;
+            Height = _normalBounds.Height;
+            WindowState = _normalState;
+        }
+        FitWidgetBoard();
+    }
+
+    private void FitWidgetBoard()
+    {
+        if (!_isWidget || BoardColumn.ActualWidth <= 0 || BoardColumn.ActualHeight <= 0) return;
+        double s = Math.Min(BoardColumn.ActualWidth / BoardFrameRoot.Width, BoardColumn.ActualHeight / BoardFrameRoot.Height);
+        BoardFrameRoot.LayoutTransform = new ScaleTransform(s, s);
+    }
+
+    private const int WmSizing = 0x0214;
+    private const int WmExitSizeMove = 0x0232;
+    private const uint SwpNoZOrder = 0x0004, SwpNoActivate = 0x0010;
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeRect { public int Left, Top, Right, Bottom; }
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hwnd, out NativeRect rect);
+
+    private IntPtr Hwnd => new WindowInteropHelper(this).Handle;
+    private string? _widgetScreen;
+
+    internal NativeRect WindowRectPx => GetWindowRect(Hwnd, out var r) ? r : default;
+
+    /// <summary>
+    /// Tamanho padrão do widget no monitor dado: ~80% da largura (até 90% da altura), na proporção do quadro.
+    /// Fica centrado em <paramref name="center"/> (ou no monitor), sem sair da área útil.
+    /// Em pixels físicos, então vale para monitores com escalas (DPI) diferentes.
+    /// </summary>
+    internal void PlaceWidgetOn(System.Windows.Forms.Screen screen, System.Drawing.Point? center = null)
+    {
+        var wa = screen.WorkingArea;
+        double ratio = BoardFrameRoot.Width / BoardFrameRoot.Height;
+        int w = (int)(wa.Width * 0.8), h = (int)Math.Round(w / ratio);
+        if (h > wa.Height * 0.9) { h = (int)(wa.Height * 0.9); w = (int)Math.Round(h * ratio); }
+        var c = center ?? new System.Drawing.Point(wa.Left + wa.Width / 2, wa.Top + wa.Height / 2);
+        int x = Math.Clamp(c.X - w / 2, wa.Left, wa.Right - w);
+        int y = Math.Clamp(c.Y - h / 2, wa.Top, wa.Bottom - h);
+        SetWindowPos(Hwnd, IntPtr.Zero, x, y, w, h, SwpNoZOrder | SwpNoActivate);
+        _widgetScreen = screen.DeviceName;
+    }
+
+    /// <summary>Soltou o widget em outro monitor: ajusta ao tamanho padrão desse monitor, onde foi solto.</summary>
+    internal void OnWidgetMoveEnded()
+    {
+        if (!_isWidget) return;
+        var screen = System.Windows.Forms.Screen.FromHandle(Hwnd);
+        if (screen.DeviceName == _widgetScreen) return;     // mesmo monitor: respeita o tamanho que o usuário deu
+        FitWidgetToCurrentScreen();
+    }
+
+    /// <summary>Ajusta ao tamanho padrão do monitor em que o widget está, mantendo o centro onde está.</summary>
+    internal void FitWidgetToCurrentScreen()
+    {
+        if (!_isWidget) return;
+        var r = WindowRectPx;
+        PlaceWidgetOn(System.Windows.Forms.Screen.FromHandle(Hwnd), new System.Drawing.Point((r.Left + r.Right) / 2, (r.Top + r.Bottom) / 2));
+    }
+
+    private IntPtr WidgetHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WmExitSizeMove) OnWidgetMoveEnded();
+        return msg == WmSizing ? KeepWidgetRatio(wParam, lParam, ref handled) : IntPtr.Zero;
+    }
+
+    /// <summary>No widget, redimensionar mantém a proporção do quadro, para nunca sobrar fundo em volta.</summary>
+    private IntPtr KeepWidgetRatio(IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (!_isWidget) return IntPtr.Zero;
+        var r = Marshal.PtrToStructure<NativeRect>(lParam);
+        double ratio = BoardFrameRoot.Width / BoardFrameRoot.Height;
+        int edge = wParam.ToInt32();    // WMSZ_: 1 esq, 2 dir, 3 topo, 4 topo-esq, 5 topo-dir, 6 base, 7 base-esq, 8 base-dir
+        if (edge is 3 or 6)
+            r.Right = r.Left + (int)Math.Round((r.Bottom - r.Top) * ratio);
+        else
+        {
+            int height = (int)Math.Round((r.Right - r.Left) / ratio);
+            if (edge is 4 or 5) r.Top = r.Bottom - height; else r.Bottom = r.Top + height;
+        }
+        Marshal.StructureToPtr(r, lParam, false);
+        handled = true;
+        return (IntPtr)1;
+    }
 
     // ---- Janela flutuante do Pomodoro (sempre no topo; não depende da janela principal estar visível) ----
 
@@ -145,7 +339,7 @@ public partial class MainWindow : Window, IBoardView
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
-        if (e.Key == Key.F11)
+        if (e.Key == Key.F11 && !_isWidget)
         {
             ToggleFullScreen();
             e.Handled = true;

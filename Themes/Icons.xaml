@@ -34,5 +34,6 @@
     <Geometry x:Key="Icon.Play">M8,5 L19,12 L8,19 Z</Geometry>
     <Geometry x:Key="Icon.Pause">M8,5 V19 M16,5 V19</Geometry>
     <Geometry x:Key="Icon.Reset">M4,12 A8,8 0 1 0 7,6 M4,4 V9 H9</Geometry>
+    <Geometry x:Key="Icon.Widget">M3,4 H21 V20 H3 Z M12,12 H18 V17 H12 Z</Geometry>
     <Geometry x:Key="Icon.Skip">M5,5 L15,12 L5,19 Z M19,5 V19</Geometry>
 </ResourceDictionary>

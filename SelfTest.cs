@@ -20,6 +20,15 @@ internal static class RealKeys
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+
+    /// <summary>Move a janela em pixels físicos, sem mudar o tamanho (NOSIZE | NOZORDER).</summary>
+    public static void MoveWindowPx(IntPtr hwnd, int x, int y) => SetWindowPos(hwnd, IntPtr.Zero, x, y, 0, 0, 0x0001 | 0x0004);
+
+    /// <summary>Muda o tamanho em pixels físicos, sem mover (NOMOVE | NOZORDER).</summary>
+    public static void ResizeWindowPx(IntPtr hwnd, int w, int h) => SetWindowPos(hwnd, IntPtr.Zero, 0, 0, w, h, 0x0002 | 0x0004);
+
     /// <summary>Aperta Ctrl + uma tecla no teclado de verdade (o app precisa estar em primeiro plano).</summary>
     public static void CtrlPress(byte vk)
     {
@@ -98,6 +107,80 @@ internal static class SelfTest
                 board.ResetView();
                 await Pump();
                 Check("zoom volta ao centro ao reiniciar a visualização", board.PanX == 0 && board.PanY == 0 && board.Zoom == 1);
+            }
+
+            // ---- Modo widget: janela pequena, mesmo quadro (só desenhado menor) ----
+            {
+                double cw = canvas.ActualWidth, ch = canvas.ActualHeight;
+                var state = window.WindowState;
+                window.ToggleWidget();
+                await Pump();
+                Check("widget: janela menor que a tela e sem barras",
+                    window.IsWidget && window.ActualWidth < SystemParameters.WorkArea.Width && window.TopBar.Visibility == Visibility.Collapsed);
+                Check("widget: o quadro mantém o tamanho lógico", canvas.ActualWidth == cw && canvas.ActualHeight == ch);
+                var onWindow = window.BoardFrameRoot.TransformToAncestor(window).TransformBounds(new Rect(window.BoardFrameRoot.RenderSize));
+                log.Add($"     widget: janela {window.ActualWidth:0}x{window.ActualHeight:0}, quadro {onWindow}");
+                Check("widget: o quadro ocupa a janela inteira (sem fundo em volta)",
+                    onWindow.Left <= 2 && onWindow.Top <= 2 &&
+                    window.ActualWidth - onWindow.Right <= 2 && window.ActualHeight - onWindow.Bottom <= 2);
+                Check("widget: barra escondida até o mouse passar", window.WidgetBar.Opacity == 0);
+
+                // Tamanho padrão = 80% da largura (ou 90% da altura) do monitor em que está.
+                bool FitsDefault(System.Windows.Forms.Screen scr)
+                {
+                    var r = window.WindowRectPx;
+                    var wa = scr.WorkingArea;
+                    int rw = r.Right - r.Left, rh = r.Bottom - r.Top;
+                    log.Add($"     widget em {scr.DeviceName} ({wa.Width}x{wa.Height}): {rw}x{rh} em {r.Left},{r.Top}");
+                    bool inside = r.Left >= wa.Left && r.Top >= wa.Top && r.Right <= wa.Right && r.Bottom <= wa.Bottom;
+                    return inside && (Math.Abs(rw - wa.Width * 0.8) <= 2 || Math.Abs(rh - wa.Height * 0.9) <= 2);
+                }
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+                Check("widget: tamanho padrão do monitor atual", FitsDefault(System.Windows.Forms.Screen.FromHandle(hwnd)));
+                var screens = System.Windows.Forms.Screen.AllScreens;
+                log.Add($"     monitores: {screens.Length}");
+                if (screens.Length > 1)
+                {
+                    var origin = System.Windows.Forms.Screen.FromHandle(hwnd);
+                    var other = screens.First(s => s.DeviceName != origin.DeviceName);
+                    var r0 = window.WindowRectPx;
+                    // Simula soltar o widget no meio do outro monitor.
+                    int ox = other.WorkingArea.Left + other.WorkingArea.Width / 2 - (r0.Right - r0.Left) / 2;
+                    int oy = other.WorkingArea.Top + other.WorkingArea.Height / 2 - (r0.Bottom - r0.Top) / 2;
+                    RealKeys.MoveWindowPx(hwnd, ox, oy);
+                    await Pump();
+                    window.OnWidgetMoveEnded();
+                    await Pump();
+                    Check("widget: ao ir para outro monitor, se ajusta a ele", FitsDefault(other));
+                }
+                // Duplo clique na barra: volta ao tamanho padrão do monitor atual, mesmo depois de redimensionar à mão.
+                RealKeys.ResizeWindowPx(hwnd, 400, 200);
+                await Pump();
+                window.FitWidgetToCurrentScreen();
+                await Pump();
+                Check("widget: duplo clique ajusta ao monitor atual", FitsDefault(System.Windows.Forms.Screen.FromHandle(hwnd)));
+                // Foto da tela de verdade, para conferir o visual.
+                window.Activate();
+                await Task.Delay(400);
+                var src = PresentationSource.FromVisual(window)!.CompositionTarget!.TransformToDevice;
+                int sx = (int)(window.Left * src.M11), sy = (int)(window.Top * src.M22);
+                int sw = (int)(window.ActualWidth * src.M11), sh = (int)(window.ActualHeight * src.M22);
+                using (var shot = new System.Drawing.Bitmap(sw, sh))
+                {
+                    using (var g = System.Drawing.Graphics.FromImage(shot))
+                        g.CopyFromScreen(sx, sy, 0, 0, new System.Drawing.Size(sw, sh));
+                    shot.Save(Path.Combine(outDir, "widget-tela.png"));
+                }
+                var full = window.RenderBoard(includeFrame: true, scale: 1, opaque: true);
+                var px = new byte[4];
+                full.CopyPixels(new Int32Rect(full.PixelWidth - 4, full.PixelHeight / 2, 1, 1), px, 4, 0);
+                log.Add($"     imagem no widget: {full.PixelWidth}x{full.PixelHeight}, borda direita BGRA={string.Join(",", px)}");
+                Check("widget: imagem do quadro sai em tamanho cheio, com a moldura na borda",
+                    full.PixelWidth >= window.BoardFrameRoot.ActualWidth - 1 && !(px[0] > 250 && px[1] > 250 && px[2] > 250));
+                window.ToggleWidget();
+                await Pump();
+                Check("widget: volta à janela completa", !window.IsWidget && window.WindowState == state &&
+                    window.TopBar.Visibility == Visibility.Visible && canvas.ActualWidth == cw);
             }
 
             // ---- Pomodoro ----

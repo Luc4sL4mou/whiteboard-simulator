@@ -35,6 +35,16 @@ O diferencial do projeto: **um timer Pomodoro nativo, integrado ao quadro**, par
 
 ![Captura do Pomodoro sobre o quadro](docs/captura-pomodoro.png)
 
+## 🪟 Modo widget
+
+O botão **Widget** (barra de cima, ao lado do zoom) transforma o quadro numa janela sem bordas que mostra **só o quadro**, sem a interface nem o fundo da janela, para deixar sobre a área de trabalho enquanto você usa outros programas.
+
+- **O mesmo quadro, só que menor:** o conteúdo é desenhado em escala. Nada é cortado nem muda de lugar, e dá para continuar desenhando (troque de ferramenta pelos atalhos de teclado).
+- **Barra discreta:** fica invisível e aparece quando o mouse passa no topo do quadro. Nela dá para **arrastar** a janela, **fixar no topo** (acima dos outros programas), **copiar imagem** e voltar à janela completa (**X**).
+- **Copiar imagem:** copia só o quadro (moldura + conteúdo), em tamanho cheio, para a área de transferência. É só colar com `Ctrl+V`.
+- **Redimensionar** por qualquer borda ou pelo canto inferior direito. A proporção do quadro é mantida, então nunca sobra fundo em volta.
+- **Vários monitores:** o tamanho padrão é ~80% da largura do monitor (até 90% da altura). Ao soltar o widget em outro monitor, ele se ajusta a esse monitor. **Duplo clique na barra** volta ao tamanho padrão do monitor atual.
+
 ## ✨ Recursos
 
 | | |
@@ -47,6 +57,7 @@ O diferencial do projeto: **um timer Pomodoro nativo, integrado ao quadro**, par
 | **Exportar** | PNG, PDF, impressão e pacote compartilhável `.wbpack` |
 | **Desfazer/refazer** | `Ctrl+Z` / `Ctrl+Y` com histórico de até 200 passos |
 | **Visual** | Tema claro/escuro, aparência do quadro, ícone na bandeja do Windows |
+| **Widget** | Quadro numa janela sem bordas sobre a área de trabalho, ajustada a cada monitor, com cópia da imagem do quadro |
 
 ### ⌨️ Atalhos
 
