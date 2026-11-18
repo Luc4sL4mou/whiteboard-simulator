@@ -47,6 +47,8 @@ public partial class MainWindow : Window, IBoardView
         };
         vm.Pomodoro.CloseRequested += () => vm.IsPomodoroOpen = false;
         BoardColumn.SizeChanged += (_, _) => FitWidgetBoard();
+        PreviewMouseMove += (_, e) => UpdateWidgetBar(e);
+        MouseLeave += (_, _) => ShowWidgetBar(false);
 
         // Depois que a janela aparece, oferece restaurar quadros de uma sessão que caiu.
         Loaded += (_, _) => Dispatcher.InvokeAsync(vm.OfferRecovery, System.Windows.Threading.DispatcherPriority.Background);
@@ -83,6 +85,26 @@ public partial class MainWindow : Window, IBoardView
         WidgetCopyLabel.Text = "Copiado!";
         await Task.Delay(1500);
         WidgetCopyLabel.Text = "Copiar imagem";
+    }
+
+    private const double WidgetHotEdge = 16;   // px do topo da janela que fazem a barra aparecer
+
+    /// <summary>
+    /// A barra aparece quando o mouse (sem botão apertado) encosta na borda de cima, e some ao sair dela.
+    /// Escondida, ela não recebe cliques: dá para desenhar no quadro inteiro.
+    /// </summary>
+    private void UpdateWidgetBar(MouseEventArgs e)
+    {
+        if (!_isWidget) return;
+        bool overBar = WidgetBar.IsHitTestVisible && WidgetBar.IsMouseOver;
+        bool idle = e.LeftButton == MouseButtonState.Released && e.RightButton == MouseButtonState.Released;
+        ShowWidgetBar(overBar || (idle && e.GetPosition(this).Y <= WidgetHotEdge));
+    }
+
+    internal void ShowWidgetBar(bool show)
+    {
+        WidgetBar.Opacity = show ? 1 : 0;
+        WidgetBar.IsHitTestVisible = show;
     }
 
     private void OnWidgetBarMouseDown(object sender, MouseButtonEventArgs e)
@@ -131,10 +153,19 @@ public partial class MainWindow : Window, IBoardView
             });
             MinWidth = 300;
             MinHeight = 300 * h / w;
-            PlaceWidgetOn(screen);
+            ShowWidgetBar(false);
+
+            // Volta com a posição e a largura da última vez, se aquele lugar ainda estiver numa tela.
+            var saved = AppSettings.Load();
+            if (saved.WidgetCenterX is { } cx && saved.WidgetCenterY is { } cy && saved.WidgetWidth is { } sw &&
+                System.Windows.Forms.Screen.AllScreens.FirstOrDefault(s => s.WorkingArea.Contains(cx, cy)) is { } savedScreen)
+                PlaceWidgetOn(savedScreen, new System.Drawing.Point(cx, cy), sw);
+            else
+                PlaceWidgetOn(screen);
         }
         else
         {
+            SaveWidgetBounds();
             RootGrid.Margin = new Thickness(12);
             GetBindingExpression(BackgroundProperty)?.UpdateTarget();
             BoardFrameRoot.LayoutTransform = Transform.Identity;
@@ -188,17 +219,31 @@ public partial class MainWindow : Window, IBoardView
     /// Fica centrado em <paramref name="center"/> (ou no monitor), sem sair da área útil.
     /// Em pixels físicos, então vale para monitores com escalas (DPI) diferentes.
     /// </summary>
-    internal void PlaceWidgetOn(System.Windows.Forms.Screen screen, System.Drawing.Point? center = null)
+    internal void PlaceWidgetOn(System.Windows.Forms.Screen screen, System.Drawing.Point? center = null, int? width = null)
     {
         var wa = screen.WorkingArea;
         double ratio = BoardFrameRoot.Width / BoardFrameRoot.Height;
-        int w = (int)(wa.Width * 0.8), h = (int)Math.Round(w / ratio);
-        if (h > wa.Height * 0.9) { h = (int)(wa.Height * 0.9); w = (int)Math.Round(h * ratio); }
+        // Sem largura dada: padrão de 80% da largura / 90% da altura. Com largura (a salva): só não passa da tela.
+        double maxW = width == null ? 0.8 : 1.0, maxH = width == null ? 0.9 : 1.0;
+        int w = Math.Min(width ?? int.MaxValue, (int)(wa.Width * maxW)), h = (int)Math.Round(w / ratio);
+        if (h > wa.Height * maxH) { h = (int)(wa.Height * maxH); w = (int)Math.Round(h * ratio); }
         var c = center ?? new System.Drawing.Point(wa.Left + wa.Width / 2, wa.Top + wa.Height / 2);
         int x = Math.Clamp(c.X - w / 2, wa.Left, wa.Right - w);
         int y = Math.Clamp(c.Y - h / 2, wa.Top, wa.Bottom - h);
         SetWindowPos(Hwnd, IntPtr.Zero, x, y, w, h, SwpNoZOrder | SwpNoActivate);
         _widgetScreen = screen.DeviceName;
+        SaveWidgetBounds();
+    }
+
+    /// <summary>Guarda centro e largura do widget (px físicos) para a próxima vez.</summary>
+    private void SaveWidgetBounds()
+    {
+        var r = WindowRectPx;
+        var settings = AppSettings.Load();
+        settings.WidgetCenterX = (r.Left + r.Right) / 2;
+        settings.WidgetCenterY = (r.Top + r.Bottom) / 2;
+        settings.WidgetWidth = r.Right - r.Left;
+        settings.Save();
     }
 
     /// <summary>Soltou o widget em outro monitor: ajusta ao tamanho padrão desse monitor, onde foi solto.</summary>
@@ -220,7 +265,11 @@ public partial class MainWindow : Window, IBoardView
 
     private IntPtr WidgetHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WmExitSizeMove) OnWidgetMoveEnded();
+        if (msg == WmExitSizeMove && _isWidget)
+        {
+            OnWidgetMoveEnded();
+            SaveWidgetBounds();
+        }
         return msg == WmSizing ? KeepWidgetRatio(wParam, lParam, ref handled) : IntPtr.Zero;
     }
 

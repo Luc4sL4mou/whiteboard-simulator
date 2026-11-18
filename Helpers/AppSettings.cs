@@ -41,6 +41,11 @@ public sealed class AppSettings
     public double? PomodoroLeft { get; set; }
     public double? PomodoroTop { get; set; }
 
+    // Modo widget: centro e largura da última vez, em pixels físicos (a altura sai da proporção do quadro).
+    public int? WidgetCenterX { get; set; }
+    public int? WidgetCenterY { get; set; }
+    public int? WidgetWidth { get; set; }
+
     /// <summary>Quadros abertos/salvos recentemente (favoritos primeiro).</summary>
     public List<RecentFile> Recent { get; set; } = new();
 

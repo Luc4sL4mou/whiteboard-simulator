@@ -41,11 +41,11 @@ O botão **Widget** (barra de cima, ao lado do zoom) transforma o quadro numa ja
 
 ![Modo widget: só o quadro sobre a área de trabalho](docs/widget.png)
 
-- **O mesmo quadro, só que menor:** o conteúdo é desenhado em escala. Nada é cortado nem muda de lugar, e dá para continuar desenhando (troque de ferramenta pelos atalhos de teclado).
-- **Barra discreta:** fica invisível e aparece quando o mouse passa no topo do quadro. Nela dá para **arrastar** a janela, **fixar no topo** (acima dos outros programas), **copiar imagem** e voltar à janela completa (**X**).
+- **O mesmo quadro, só que menor:** o conteúdo é desenhado em escala. Nada é cortado nem muda de lugar, e dá para continuar desenhando.
+- **Barra discreta:** fica invisível (sem bloquear o desenho) e aparece quando o mouse encosta na borda de cima. Nela ficam as **ferramentas** e dá para **arrastar** a janela, **fixar no topo** (acima dos outros programas), **copiar imagem** e voltar à janela completa (**X**).
 - **Copiar imagem:** copia só o quadro (moldura + conteúdo), em tamanho cheio, para a área de transferência. É só colar com `Ctrl+V`.
 - **Redimensionar** por qualquer borda ou pelo canto inferior direito. A proporção do quadro é mantida, então nunca sobra fundo em volta.
-- **Vários monitores:** o tamanho padrão é ~80% da largura do monitor (até 90% da altura). Ao soltar o widget em outro monitor, ele se ajusta a esse monitor. **Duplo clique na barra** volta ao tamanho padrão do monitor atual.
+- **Vários monitores:** o tamanho padrão é ~80% da largura do monitor (até 90% da altura). Ao soltar o widget em outro monitor, ele se ajusta a esse monitor. **Duplo clique na barra** volta ao tamanho padrão do monitor atual. Posição e tamanho são lembrados para a próxima vez.
 
 ## ✨ Recursos
 

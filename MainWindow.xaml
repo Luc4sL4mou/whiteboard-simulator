@@ -204,21 +204,12 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Barra do modo widget (só nele): flutua sobre o topo do quadro e só aparece com o mouse em cima -->
+        <!-- Barra do modo widget (só nele): flutua sobre o topo do quadro. Escondida, não bloqueia o desenho;
+             aparece quando o mouse encosta na borda de cima (ver UpdateWidgetBar). -->
         <Border x:Name="WidgetBar" Grid.Row="1" Grid.Column="1" Panel.ZIndex="10" VerticalAlignment="Top"
-                Margin="10" Padding="8,2" CornerRadius="12"
+                Margin="10" Padding="8,2" CornerRadius="12" Opacity="0" IsHitTestVisible="False"
                 Background="{StaticResource Brush.Surface}" Visibility="Collapsed"
                 MouseLeftButtonDown="OnWidgetBarMouseDown" Cursor="SizeAll" ToolTip="Arraste para mover · duplo clique ajusta ao tamanho do monitor">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Opacity" Value="0" />
-                    <Style.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Opacity" Value="1" />
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
             <DockPanel>
                 <Button DockPanel.Dock="Right" Style="{StaticResource TopBarButtonStyle}" Click="OnWidgetClick" Cursor="Arrow"
                         ToolTip="Voltar à janela completa" AutomationProperties.Name="Sair do modo widget">
@@ -238,6 +229,18 @@
                         <TextBlock x:Name="WidgetTopmostLabel" Text="Fixar no topo" Style="{StaticResource BarLabel}" />
                     </StackPanel>
                 </Button>
+                <!-- Ferramentas (a barra lateral some no widget) -->
+                <ItemsControl DockPanel.Dock="Left" ItemsSource="{Binding Tools}" ItemTemplate="{StaticResource ToolTemplate}"
+                              Focusable="False" Cursor="Arrow" Margin="0,0,8,0">
+                    <ItemsControl.LayoutTransform>
+                        <ScaleTransform ScaleX="0.75" ScaleY="0.75" />
+                    </ItemsControl.LayoutTransform>
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
                 <TextBlock Text="{Binding WindowTitle}" Style="{StaticResource BarLabel}" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" />
             </DockPanel>

@@ -113,6 +113,10 @@ internal static class SelfTest
             {
                 double cw = canvas.ActualWidth, ch = canvas.ActualHeight;
                 var state = window.WindowState;
+                // Começa sem posição salva (rodadas anteriores do teste guardam uma).
+                var clean = AppSettings.Load();
+                clean.WidgetCenterX = clean.WidgetCenterY = clean.WidgetWidth = null;
+                clean.Save();
                 window.ToggleWidget();
                 await Pump();
                 Check("widget: janela menor que a tela e sem barras",
@@ -124,6 +128,31 @@ internal static class SelfTest
                     onWindow.Left <= 2 && onWindow.Top <= 2 &&
                     window.ActualWidth - onWindow.Right <= 2 && window.ActualHeight - onWindow.Bottom <= 2);
                 Check("widget: barra escondida até o mouse passar", window.WidgetBar.Opacity == 0);
+
+                // Escondida, a barra não pode bloquear o desenho no topo do quadro.
+                bool HitsBar(Point p)
+                {
+                    for (var d = window.InputHitTest(p) as DependencyObject; d != null; d = VisualTreeHelper.GetParent(d))
+                        if (d == window.WidgetBar) return true;
+                    return false;
+                }
+                var topPoint = new Point(window.ActualWidth / 2, 30);
+                Check("widget: barra escondida não bloqueia o topo do quadro", !HitsBar(topPoint));
+                window.ShowWidgetBar(true);
+                await Pump();
+                int toolButtons = 0;
+                void CountButtons(DependencyObject d)
+                {
+                    for (int i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++)
+                    {
+                        var c = VisualTreeHelper.GetChild(d, i);
+                        if (c is Button { Command: var cmd } && cmd == vm.SelectToolCommand) toolButtons++;
+                        CountButtons(c);
+                    }
+                }
+                CountButtons(window.WidgetBar);
+                Check($"widget: barra visível recebe cliques e tem as ferramentas ({toolButtons})", HitsBar(topPoint) && toolButtons == vm.Tools.Count);
+                window.ShowWidgetBar(false);
 
                 // Tamanho padrão = 80% da largura (ou 90% da altura) do monitor em que está.
                 bool FitsDefault(System.Windows.Forms.Screen scr)
@@ -181,6 +210,24 @@ internal static class SelfTest
                 await Pump();
                 Check("widget: volta à janela completa", !window.IsWidget && window.WindowState == state &&
                     window.TopBar.Visibility == Visibility.Visible && canvas.ActualWidth == cw);
+
+                // Lembra posição e largura entre uma vez e outra.
+                window.ToggleWidget();
+                await Pump();
+                double ratio = window.BoardFrameRoot.Width / window.BoardFrameRoot.Height;
+                RealKeys.ResizeWindowPx(hwnd, 700, (int)Math.Round(700 / ratio));
+                await Pump();
+                var rBefore = window.WindowRectPx;
+                window.ToggleWidget();
+                await Pump();
+                window.ToggleWidget();
+                await Pump();
+                var rAfter = window.WindowRectPx;
+                log.Add($"     widget lembrado: antes {rBefore.Left},{rBefore.Top} {rBefore.Right - rBefore.Left}px, depois {rAfter.Left},{rAfter.Top} {rAfter.Right - rAfter.Left}px");
+                Check("widget: lembra posição e largura", Math.Abs((rAfter.Right - rAfter.Left) - 700) <= 2 &&
+                    Math.Abs(rAfter.Left - rBefore.Left) <= 2 && Math.Abs(rAfter.Top - rBefore.Top) <= 2);
+                window.ToggleWidget();
+                await Pump();
             }
 
             // ---- Pomodoro ----
